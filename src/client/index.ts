@@ -96,6 +96,7 @@ export type CallToolResult = {
   content: ContentBlock[];
   structuredContent?: Record<string, unknown>;
   isError?: boolean;
+  _meta?: Record<string, unknown>;
 };
 
 const RESULT = Symbol("mcpCallToolResult");
@@ -122,6 +123,15 @@ export type ToolDefinition<
   /** Optional validator for the result; exposed as `outputSchema`. */
   returns?: Returns;
   annotations?: ToolAnnotations;
+  /**
+   * App metadata advertised with this tool in `tools/list`. Opaque to the
+   * component and passed through verbatim: MCP reserves `_meta` on every
+   * object for metadata like this, and only keys with MCP-reserved prefixes
+   * (second label `modelcontextprotocol` or `mcp`, e.g.
+   * `io.modelcontextprotocol/`) are protocol-owned. For example,
+   * `{ "com.example/category": "reports" }`.
+   */
+  meta?: Record<string, unknown>;
   /**
    * OAuth scope required to see and call this tool. Must be one of the
    * server's `scopes`. Tools without a scope are available to every
@@ -302,6 +312,7 @@ export class McpServer<UserId extends string = string> {
           ...(definition.annotations
             ? { annotations: definition.annotations }
             : {}),
+          ...(definition.meta ? { _meta: definition.meta } : {}),
         },
       });
     }
@@ -617,15 +628,17 @@ export class McpServer<UserId extends string = string> {
       }
     }
 
-    const result = (value: Record<string, unknown>) =>
-      json(
+    const result = (value: Record<string, unknown>) => {
+      const appMeta = isObject(value._meta) ? value._meta : {};
+      return json(
         rpcResult(id, {
           resultType: "complete",
           ...value,
-          _meta: { [`${META}serverInfo`]: this.serverInfo },
+          _meta: { ...appMeta, [`${META}serverInfo`]: this.serverInfo },
         }),
         200,
       );
+    };
     switch (method) {
       case "server/discover":
         return result({
@@ -800,7 +813,8 @@ export class McpServer<UserId extends string = string> {
       return errorResult(`Tool "${t.name}" failed. Please try again later.`);
     }
     if (isObject(value) && (value as any)[RESULT]) {
-      const { content, structuredContent, isError } = value as CallToolResult;
+      const { content, structuredContent, isError, _meta } =
+        value as CallToolResult;
       // structuredContent must still match `returns`. Content blocks are the
       // developer's responsibility.
       if (t.returns && !isError) {
@@ -814,6 +828,7 @@ export class McpServer<UserId extends string = string> {
         content,
         ...(structuredContent ? { structuredContent } : {}),
         ...(isError ? { isError } : {}),
+        ...(_meta ? { _meta } : {}),
       };
     }
     if (t.returns) {

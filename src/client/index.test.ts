@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { ConvexError, v } from "convex/values";
-import { McpServer, tool } from "./index.js";
+import { McpServer, callToolResult, tool } from "./index.js";
 import { components } from "./setup.test.js";
 
 function server(tools: ConstructorParameters<typeof McpServer>[1]["tools"]) {
@@ -277,6 +277,30 @@ describe("MCP 2026-07-28 (stateless)", () => {
     expect(ping.body.error.code).toBe(-32601);
   });
 
+  test("tool _meta survives next to serverInfo", async () => {
+    const srv = server({
+      styled: tool({
+        description: "Styled",
+        meta: { "com.example/category": "charts" },
+        handler: async () =>
+          callToolResult({
+            content: [{ type: "text", text: "ok" }],
+            _meta: { "com.example/theme": "dark" },
+          }),
+      }),
+    });
+    const list = await modern(srv, "tools/list");
+    expect(list.body.result.tools[0]._meta).toEqual({
+      "com.example/category": "charts",
+    });
+    // Both the app's keys and the server's identity are present: merge, not replace.
+    const res = await modern(srv, "tools/call", { name: "styled", arguments: {} });
+    expect(res.body.result._meta).toEqual({
+      "com.example/theme": "dark",
+      [`${META}serverInfo`]: { name: "test", version: "1" },
+    });
+  });
+
   test("legacy clients still initialize", async () => {
     const r = await call(s(), ctx(), rpc("initialize", { protocolVersion: "2025-11-25" }), "2025-11-25");
     expect(r.body.result.protocolVersion).toBe("2025-11-25");
@@ -286,9 +310,42 @@ describe("MCP 2026-07-28 (stateless)", () => {
   });
 });
 
+describe("_meta", () => {
+  const appMeta = {
+    "com.example/category": "dashboards",
+    "com.example/flags": { pinned: true },
+  };
+
+  const withMeta = () =>
+    server({
+      show: tool({
+        description: "Show a dashboard",
+        meta: appMeta,
+        handler: async () =>
+          callToolResult({
+            content: [{ type: "text", text: "ok" }],
+            _meta: appMeta,
+          }),
+      }),
+      plain: tool({ description: "Plain", handler: async () => "ok" }),
+    });
+
+  test("tools/list advertises tool _meta, and omits it when unset", async () => {
+    const r = await call(withMeta(), ctx(), rpc("tools/list"));
+    const [show, plain] = r.body.result.tools;
+    expect(show._meta).toEqual(appMeta);
+    expect(plain).not.toHaveProperty("_meta");
+  });
+
+  test("a tool result _meta reaches the client", async () => {
+    const r = await call(withMeta(), ctx(), rpc("tools/call", { name: "show", arguments: {} }));
+    expect(r.body.result._meta).toEqual(appMeta);
+    expect(r.body.result.content).toEqual([{ type: "text", text: "ok" }]);
+  });
+});
+
 describe("callToolResult", () => {
   test("structuredContent is still checked against returns", async () => {
-    const { callToolResult } = await import("./index.js");
     const s = server({
       leak: tool({
         description: "leak",
