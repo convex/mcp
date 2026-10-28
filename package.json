@@ -1,10 +1,10 @@
 {
   "name": "@convex-dev/mcp",
   "description": "Turn your Convex app into an MCP server, so your users can use your app from their AI agents.",
-  "repository": "github:get-convex/mcp",
-  "homepage": "https://github.com/get-convex/mcp#readme",
+  "repository": "github:convex/mcp",
+  "homepage": "https://github.com/convex/mcp#readme",
   "bugs": {
-    "url": "https://github.com/get-convex/mcp/issues"
+    "url": "https://github.com/convex/mcp/issues"
   },
   "version": "0.1.0-alpha.7",
   "license": "Apache-2.0",
