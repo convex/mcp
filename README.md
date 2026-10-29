@@ -54,7 +54,7 @@ on the same endpoint, over Streamable HTTP. Everything runs inside your
 Convex deployment: no separate server or auth provider.
 
 Found a bug? Feature request?
-[File it here](https://github.com/get-convex/mcp/issues).
+[File it here](https://github.com/convex/mcp/issues).
 
 ## Quick start: paste this into your coding agent
 
@@ -375,7 +375,7 @@ This package ships two agent skills:
   real users.
 
 ```sh
-npx skills add get-convex/mcp
+npx skills add convex/mcp
 ```
 
 ## Testing
