@@ -288,6 +288,12 @@ connections UI.
   didn't declare reaches the agent.
 - **Full control.** Return `callToolResult({ content: [...], isError })` to
   shape the result yourself, for example to return images.
+- **`_meta`.** Attach app metadata with `meta` on a tool (advertised in
+  `tools/list`) or `_meta` on a `callToolResult` (returned with the result).
+  It is opaque to the component: MCP reserves `_meta` for metadata on any
+  object, and only keys with MCP-reserved prefixes (e.g.
+  `io.modelcontextprotocol/`) are protocol-owned. On MCP 2026-07-28 it is
+  merged with the server's `serverInfo`.
 - **Errors.** Throw `ConvexError("…")` to send the model a message it can act
   on. Other errors are logged, and the model gets a generic failure.
 
