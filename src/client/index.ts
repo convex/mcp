@@ -34,7 +34,7 @@ export { toJsonSchema, checkValue } from "./schema.js";
 export type ToolCtx = GenericActionCtx<GenericDataModel>;
 
 /** The ctx `getUserId` in `mcp.api()` receives. */
-export type ApiCtx<DataModel extends GenericDataModel = GenericDataModel> =
+export type GetUserIdCtx<DataModel extends GenericDataModel = GenericDataModel> =
   | GenericQueryCtx<DataModel>
   | GenericMutationCtx<DataModel>
   | GenericActionCtx<DataModel>;
@@ -1257,10 +1257,10 @@ export class McpServer<UserId extends string = string> {
    * to tell queries and mutations from actions).
    */
   api<DataModel extends GenericDataModel = GenericDataModel>(opts: {
-    getUserId: (ctx: ApiCtx<DataModel>) => Promise<UserId | null>;
+    getUserId: (ctx: GetUserIdCtx<DataModel>) => Promise<UserId | null>;
   }) {
     const component = this.component;
-    const requireUser = async (ctx: ApiCtx<DataModel>) => {
+    const requireUser = async (ctx: GetUserIdCtx<DataModel>) => {
       const userId = await opts.getUserId(ctx);
       if (!userId) throw new ConvexError("Not signed in");
       return userId;
