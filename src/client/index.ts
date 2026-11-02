@@ -6,9 +6,10 @@ import {
   queryGeneric,
 } from "convex/server";
 import type {
-  Auth,
   GenericActionCtx,
   GenericDataModel,
+  GenericMutationCtx,
+  GenericQueryCtx,
   HttpRouter,
 } from "convex/server";
 import { ConvexError, v } from "convex/values";
@@ -31,6 +32,12 @@ export { toJsonSchema, checkValue } from "./schema.js";
 
 /** The `ctx` tool handlers receive: an HTTP action context. */
 export type ToolCtx = GenericActionCtx<GenericDataModel>;
+
+/** The ctx `getUserId` in `mcp.api()` receives. */
+export type ApiCtx<DataModel extends GenericDataModel = GenericDataModel> =
+  | GenericQueryCtx<DataModel>
+  | GenericMutationCtx<DataModel>
+  | GenericActionCtx<DataModel>;
 
 /**
  * Who a tool call acts for. `userId` comes from a verified credential: it is
@@ -1245,12 +1252,15 @@ export class McpServer<UserId extends string = string> {
    * `getUserId` decides who a connection acts for; tools receive the same
    * value as `user.userId`. Use a stable ID that cannot collide across
    * identity providers (e.g. `tokenIdentifier`, or your users table ID).
+   * It receives the ctx of the query, mutation or action being called, so it
+   * can also check that the user is still allowed in (e.g. with `"db" in ctx`
+   * to tell queries and mutations from actions).
    */
-  api(opts: {
-    getUserId: (ctx: { auth: Auth }) => Promise<UserId | null>;
+  api<DataModel extends GenericDataModel = GenericDataModel>(opts: {
+    getUserId: (ctx: ApiCtx<DataModel>) => Promise<UserId | null>;
   }) {
     const component = this.component;
-    const requireUser = async (ctx: { auth: Auth }) => {
+    const requireUser = async (ctx: ApiCtx<DataModel>) => {
       const userId = await opts.getUserId(ctx);
       if (!userId) throw new ConvexError("Not signed in");
       return userId;
