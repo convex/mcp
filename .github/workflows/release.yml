@@ -10,7 +10,7 @@ name: Release
 #
 # Setup (one time, on npmjs.com): the package settings for
 # @convex-dev/mcp → "Trusted Publisher" → GitHub Actions, pointing at
-# repo get-convex/mcp and workflow file `release.yml`.
+# repo convex/mcp and workflow file `release.yml`.
 on:
   push:
     tags:
