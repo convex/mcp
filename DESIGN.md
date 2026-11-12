@@ -67,6 +67,12 @@ export const { getAuthRequest, authorize, listConnections, revokeConnection,
 - Optional `returns` validator → `outputSchema` + `structuredContent`, and
   enforced: a non-conforming result (incl. extra fields) becomes a generic
   tool error, so undeclared fields never leak.
+- Optional `meta` on a tool → `_meta` on its `tools/list` entry; `_meta` on a
+  `callToolResult` → `_meta` on the result. Opaque to the component: the spec
+  reserves `_meta` for app metadata, and only keys with MCP-reserved prefixes
+  (second label `modelcontextprotocol` or `mcp`, e.g.
+  `io.modelcontextprotocol/`) are protocol-owned. Since 2026-07-28 also puts
+  `serverInfo` there, the modern path merges rather than replaces it.
 - Handler return: string → text content; anything else → JSON text content
   (+ structuredContent when it's an object). Handlers may also return a full
   `CallToolResult`.
@@ -81,7 +87,8 @@ export const { getAuthRequest, authorize, listConnections, revokeConnection,
   use MCP 2026-07-28: no `initialize`, `server/discover`, required
   `MCP-Protocol-Version` / `Mcp-Method` / `Mcp-Name` headers that must match
   the body (`-32020`), `-32022` with the supported versions, `resultType` +
-  `serverInfo` `_meta` on every result, `ttlMs`/`cacheScope` on lists
+  `serverInfo` `_meta` on every result (merged with any app `_meta`),
+  `ttlMs`/`cacheScope` on lists
   (`private` for `tools/list`, which depends on the token's scopes), 404 for
   unknown methods. Other requests get the legacy behavior below.
 - Streamable HTTP, **stateless**: no `Mcp-Session-Id`. Requests are answered
