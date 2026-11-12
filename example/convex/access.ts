@@ -3,7 +3,7 @@
 // helpers inside their transaction, so the two paths can't drift apart.
 //
 // Swap the body of `roleFor` for another source of truth (a sharing
-// component such as get-convex/shareable, an org/roles table, a projection of
+// component such as convex/shareable, an org/roles table, a projection of
 // an external engine) without touching any caller.
 import { ConvexError } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel.js";
