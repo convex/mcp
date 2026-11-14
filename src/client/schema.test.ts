@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { v } from "convex/values";
-import { checkValue, toJsonSchema, toJsonValue, toObjectValidator } from "./schema.js";
+import {
+  checkValue,
+  toJsonSchema,
+  toJsonValue,
+  toObjectValidator,
+} from "./schema.js";
 
 describe("toJsonSchema", () => {
   test("objects, optional fields and nested types", () => {
@@ -67,7 +72,9 @@ describe("checkValue", () => {
       ok: false,
       error: "arguments.text: required",
     });
-    expect(checkValue(args, { text: "x", n: "1", kind: "a", extra: 1 })).toMatchObject({
+    expect(
+      checkValue(args, { text: "x", n: "1", kind: "a", extra: 1 }),
+    ).toMatchObject({
       ok: false,
       error: 'arguments: unexpected field "extra"',
     });

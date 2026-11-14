@@ -27,7 +27,11 @@ async function approvedCode(t: ReturnType<typeof initConvexTest>) {
     codeHash: "code1",
     codeTtlMs: 60_000,
   });
-  expect(decided).toEqual({ kind: "redirect", redirectUri: "https://agent.example/cb", state: "s" });
+  expect(decided).toEqual({
+    kind: "redirect",
+    redirectUri: "https://agent.example/cb",
+    state: "s",
+  });
 }
 
 const exchange = {
@@ -52,16 +56,24 @@ describe("authorization code", () => {
       ok: true,
       scopes: ["read"],
     });
-    expect(await t.query(api.tokens.verify, { hash: "at1", now: Date.now() })).toMatchObject({
+    expect(
+      await t.query(api.tokens.verify, { hash: "at1", now: Date.now() }),
+    ).toMatchObject({
       userId: "user1",
       scopes: ["read"],
       resource: "https://app.example/mcp",
       clientId: "client1",
     });
     // Refresh tokens are not bearer credentials for the MCP endpoint.
-    expect(await t.query(api.tokens.verify, { hash: "rt1", now: Date.now() })).toBeNull();
     expect(
-      await t.mutation(api.oauth.exchangeCode, { ...exchange, accessHash: "x", refreshHash: "y" }),
+      await t.query(api.tokens.verify, { hash: "rt1", now: Date.now() }),
+    ).toBeNull();
+    expect(
+      await t.mutation(api.oauth.exchangeCode, {
+        ...exchange,
+        accessHash: "x",
+        refreshHash: "y",
+      }),
     ).toEqual({ ok: false, error: "invalid_grant" });
   });
 
@@ -69,7 +81,10 @@ describe("authorization code", () => {
     const t = initConvexTest();
     await approvedCode(t);
     expect(
-      await t.mutation(api.oauth.exchangeCode, { ...exchange, verifierChallenge: "wrong" }),
+      await t.mutation(api.oauth.exchangeCode, {
+        ...exchange,
+        verifierChallenge: "wrong",
+      }),
     ).toEqual({ ok: false, error: "invalid_grant" });
     expect(await t.mutation(api.oauth.exchangeCode, exchange)).toEqual({
       ok: false,
@@ -81,7 +96,10 @@ describe("authorization code", () => {
     const t = initConvexTest();
     await approvedCode(t);
     expect(
-      await t.mutation(api.oauth.exchangeCode, { ...exchange, clientId: "other" }),
+      await t.mutation(api.oauth.exchangeCode, {
+        ...exchange,
+        clientId: "other",
+      }),
     ).toEqual({ ok: false, error: "invalid_grant" });
   });
 
@@ -112,7 +130,11 @@ describe("authorization code", () => {
 });
 
 describe("refresh tokens", () => {
-  const refresh = (t: ReturnType<typeof initConvexTest>, refreshHash: string, n: number) =>
+  const refresh = (
+    t: ReturnType<typeof initConvexTest>,
+    refreshHash: string,
+    n: number,
+  ) =>
     t.mutation(api.oauth.refresh, {
       refreshHash,
       clientId: "client1",
@@ -127,7 +149,9 @@ describe("refresh tokens", () => {
     await t.mutation(api.oauth.exchangeCode, exchange);
     expect((await refresh(t, "rt1", 2)).ok).toBe(true);
     expect((await refresh(t, "rt2", 3)).ok).toBe(true);
-    expect(await t.query(api.tokens.verify, { hash: "at3", now: Date.now() })).not.toBeNull();
+    expect(
+      await t.query(api.tokens.verify, { hash: "at3", now: Date.now() }),
+    ).not.toBeNull();
   });
 
   test("replaying any earlier generation revokes the connection", async () => {
@@ -138,9 +162,17 @@ describe("refresh tokens", () => {
     await refresh(t, "rt2", 3);
     await refresh(t, "rt3", 4);
     // rt1 is three generations old.
-    expect(await refresh(t, "rt1", 5)).toEqual({ ok: false, error: "invalid_grant" });
-    expect(await t.query(api.tokens.verify, { hash: "at4", now: Date.now() })).toBeNull();
-    expect(await refresh(t, "rt4", 6)).toEqual({ ok: false, error: "invalid_grant" });
+    expect(await refresh(t, "rt1", 5)).toEqual({
+      ok: false,
+      error: "invalid_grant",
+    });
+    expect(
+      await t.query(api.tokens.verify, { hash: "at4", now: Date.now() }),
+    ).toBeNull();
+    expect(await refresh(t, "rt4", 6)).toEqual({
+      ok: false,
+      error: "invalid_grant",
+    });
   });
 
   test("are bound to their client", async () => {
@@ -186,8 +218,12 @@ describe("connections", () => {
       accessHash: "at2",
       refreshHash: "rt2",
     });
-    expect(await t.query(api.tokens.verify, { hash: "at1", now: Date.now() })).not.toBeNull();
-    expect(await t.query(api.tokens.verify, { hash: "at2", now: Date.now() })).not.toBeNull();
+    expect(
+      await t.query(api.tokens.verify, { hash: "at1", now: Date.now() }),
+    ).not.toBeNull();
+    expect(
+      await t.query(api.tokens.verify, { hash: "at2", now: Date.now() }),
+    ).not.toBeNull();
     expect(await t.query(api.grants.list, { userId: "user1" })).toHaveLength(2);
   });
 
@@ -196,7 +232,9 @@ describe("connections", () => {
     await approvedCode(t);
     await t.mutation(api.oauth.exchangeCode, exchange);
     const later = Date.now() + ttls.accessTtlMs + 1;
-    expect(await t.query(api.tokens.verify, { hash: "at1", now: later })).toBeNull();
+    expect(
+      await t.query(api.tokens.verify, { hash: "at1", now: later }),
+    ).toBeNull();
   });
 });
 
@@ -210,14 +248,24 @@ describe("grants", () => {
       resource: "https://app.example/mcp",
       hash: "key1",
     });
-    expect(await t.query(api.tokens.verify, { hash: "key1", now: Date.now() })).toMatchObject({
+    expect(
+      await t.query(api.tokens.verify, { hash: "key1", now: Date.now() }),
+    ).toMatchObject({
       userId: "user1",
       kind: "apiKey",
     });
-    expect(await t.mutation(api.grants.revoke, { userId: "user2", grantId })).toBe(false);
-    expect(await t.mutation(api.grants.revoke, { userId: "user1", grantId: "junk" })).toBe(false);
-    expect(await t.mutation(api.grants.revoke, { userId: "user1", grantId })).toBe(true);
-    expect(await t.query(api.tokens.verify, { hash: "key1", now: Date.now() })).toBeNull();
+    expect(
+      await t.mutation(api.grants.revoke, { userId: "user2", grantId }),
+    ).toBe(false);
+    expect(
+      await t.mutation(api.grants.revoke, { userId: "user1", grantId: "junk" }),
+    ).toBe(false);
+    expect(
+      await t.mutation(api.grants.revoke, { userId: "user1", grantId }),
+    ).toBe(true);
+    expect(
+      await t.query(api.tokens.verify, { hash: "key1", now: Date.now() }),
+    ).toBeNull();
   });
 });
 
@@ -249,7 +297,9 @@ describe("cleanup", () => {
     vi.advanceTimersByTime(25 * 60 * 60 * 1000);
     await t.mutation(internal.crons.cleanup, {});
     expect(await t.query(api.clients.get, { clientId: "unused" })).toBeNull();
-    expect(await t.query(api.clients.get, { clientId: "client1" })).not.toBeNull();
+    expect(
+      await t.query(api.clients.get, { clientId: "client1" }),
+    ).not.toBeNull();
     vi.useRealTimers();
   });
 
@@ -298,7 +348,10 @@ describe("device flow", () => {
   test("pending → slow_down (interval grows) → approved → single-use access token", async () => {
     const t = initConvexTest();
     await start(t);
-    expect(await poll(t)).toEqual({ ok: false, error: "authorization_pending" });
+    expect(await poll(t)).toEqual({
+      ok: false,
+      error: "authorization_pending",
+    });
     expect(await poll(t)).toEqual({ ok: false, error: "slow_down" });
     const row = await t.run((ctx) => ctx.db.query("authRequests").first());
     expect(row && "pollIntervalMs" in row && row.pollIntervalMs).toBe(10_000);
@@ -323,14 +376,19 @@ describe("device flow", () => {
       }),
     ).toEqual({ kind: "device", confirmed: true });
     expect(await poll(t)).toEqual({ ok: true, scopes: ["read"] });
-    expect(await t.query(api.tokens.verify, { hash: "dat", now: Date.now() })).toMatchObject({
+    expect(
+      await t.query(api.tokens.verify, { hash: "dat", now: Date.now() }),
+    ).toMatchObject({
       userId: "user1",
       scopes: ["read"],
     });
     // No refresh token is issued for device grants.
     const tokens = await t.run((ctx) => ctx.db.query("tokens").collect());
     expect(tokens.map((x) => x.kind)).toEqual(["access"]);
-    expect(await poll(t, "again")).toEqual({ ok: false, error: "invalid_grant" });
+    expect(await poll(t, "again")).toEqual({
+      ok: false,
+      error: "invalid_grant",
+    });
   });
 
   test("denied → access_denied; wrong client → invalid_grant", async () => {
@@ -364,7 +422,10 @@ describe("device flow", () => {
       confirmedUserCode: "BCDF-GHJK",
     });
     expect(
-      await t.mutation(api.oauth.exchangeCode, { ...exchange, codeHash: "dc1" }),
+      await t.mutation(api.oauth.exchangeCode, {
+        ...exchange,
+        codeHash: "dc1",
+      }),
     ).toEqual({ ok: false, error: "invalid_grant" });
   });
 
@@ -372,11 +433,18 @@ describe("device flow", () => {
     const t = initConvexTest();
     await start(t);
     const find = () =>
-      t.mutation(api.oauth.findByUserCode, { userCode: "ZZZZ-ZZZZ", limitKey: "user1" });
-    for (let i = 0; i < 5; i++) expect(await find()).toEqual({ ok: true, requestId: null });
+      t.mutation(api.oauth.findByUserCode, {
+        userCode: "ZZZZ-ZZZZ",
+        limitKey: "user1",
+      });
+    for (let i = 0; i < 5; i++)
+      expect(await find()).toEqual({ ok: true, requestId: null });
     expect((await find()).ok).toBe(false);
     expect(
-      await t.mutation(api.oauth.findByUserCode, { userCode: "BCDF-GHJK", limitKey: "user2" }),
+      await t.mutation(api.oauth.findByUserCode, {
+        userCode: "BCDF-GHJK",
+        limitKey: "user2",
+      }),
     ).toEqual({ ok: true, requestId: "dreq" });
   });
 });

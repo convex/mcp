@@ -9,7 +9,12 @@ import { listsFor, requireList, requireTodo } from "./access.js";
 import { checkText } from "./todos.js";
 
 const user = vMcpUser(v.id("users"));
-const shape = (t: Doc<"todos">) => ({ id: t._id, text: t.text, done: t.done, listId: t.listId });
+const shape = (t: Doc<"todos">) => ({
+  id: t._id,
+  text: t.text,
+  done: t.done,
+  listId: t.listId,
+});
 
 export const lists = internalQuery({
   args: { user },
@@ -41,7 +46,9 @@ export const todos = internalQuery({
             .take(limit)
         : await ctx.db
             .query("todos")
-            .withIndex("list_done", (q) => q.eq("listId", list._id).eq("done", done))
+            .withIndex("list_done", (q) =>
+              q.eq("listId", list._id).eq("done", done),
+            )
             .order("desc")
             .take(limit);
     return rows.map(shape);
@@ -53,7 +60,11 @@ export const add = internalMutation({
   handler: async (ctx, args) => {
     const { list } = await requireList(ctx, args.user, args.listId, "edit");
     const text = checkText(args.text);
-    const id = await ctx.db.insert("todos", { listId: list._id, text, done: false });
+    const id = await ctx.db.insert("todos", {
+      listId: list._id,
+      text,
+      done: false,
+    });
     return { id, text, done: false, listId: list._id };
   },
 });

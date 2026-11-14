@@ -42,8 +42,9 @@ requests, grants, token issue/rotate/verify/revoke, API keys, cleanup.
 
 ```ts
 const mcp = new McpServer(components.mcp, {
-  name: "Todos", version: "1.0.0",
-  consentUrl: "https://app.example.com/connect",   // app page, user signed in
+  name: "Todos",
+  version: "1.0.0",
+  consentUrl: "https://app.example.com/connect", // app page, user signed in
   tools: {
     list_todos: tool({
       description: "List the user's todos",
@@ -55,45 +56,50 @@ const mcp = new McpServer(components.mcp, {
   },
 });
 mcp.registerRoutes(http);
-export const { getAuthRequest, authorize, listConnections, revokeConnection,
-  createApiKey } = mcp.api({ getUserId: getAuthUserId /* or tokenIdentifier */ });
+export const {
+  getAuthRequest,
+  authorize,
+  listConnections,
+  revokeConnection,
+  createApiKey,
+} = mcp.api({ getUserId: getAuthUserId /* or tokenIdentifier */ });
 ```
 
 - `args` are Convex validators. The client converts them to JSON Schema for
-  `tools/list` (`inputSchema`) and validates incoming arguments against the
-  same validator JSON before calling the handler. Validation failures become
+  `tools/list` (`inputSchema`) and validates incoming arguments against the same
+  validator JSON before calling the handler. Validation failures become
   `isError: true` tool results (so the model can self-correct), not JSON-RPC
   protocol errors.
 - Optional `returns` validator → `outputSchema` + `structuredContent`, and
-  enforced: a non-conforming result (incl. extra fields) becomes a generic
-  tool error, so undeclared fields never leak.
+  enforced: a non-conforming result (incl. extra fields) becomes a generic tool
+  error, so undeclared fields never leak.
 - Optional `meta` on a tool → `_meta` on its `tools/list` entry; `_meta` on a
   `callToolResult` → `_meta` on the result. Opaque to the component: the spec
   reserves `_meta` for app metadata, and only keys with MCP-reserved prefixes
   (second label `modelcontextprotocol` or `mcp`, e.g.
   `io.modelcontextprotocol/`) are protocol-owned. Since 2026-07-28 also puts
   `serverInfo` there, the modern path merges rather than replaces it.
-- Handler return: string → text content; anything else → JSON text content
-  (+ structuredContent when it's an object). Handlers may also return a full
+- Handler return: string → text content; anything else → JSON text content (+
+  structuredContent when it's an object). Handlers may also return a full
   `CallToolResult`.
-- Thrown `ConvexError` → `isError` result with its data; other errors →
-  generic message (don't leak internals), logged.
+- Thrown `ConvexError` → `isError` result with its data; other errors → generic
+  message (don't leak internals), logged.
 - `userId` is always from the verified token; tool handlers never trust
   arguments for identity.
 
 ## Protocol
 
-- **Dual-era.** Requests carrying `_meta["io.modelcontextprotocol/protocolVersion"]`
-  use MCP 2026-07-28: no `initialize`, `server/discover`, required
-  `MCP-Protocol-Version` / `Mcp-Method` / `Mcp-Name` headers that must match
-  the body (`-32020`), `-32022` with the supported versions, `resultType` +
-  `serverInfo` `_meta` on every result (merged with any app `_meta`),
-  `ttlMs`/`cacheScope` on lists
+- **Dual-era.** Requests carrying
+  `_meta["io.modelcontextprotocol/protocolVersion"]` use MCP 2026-07-28: no
+  `initialize`, `server/discover`, required `MCP-Protocol-Version` /
+  `Mcp-Method` / `Mcp-Name` headers that must match the body (`-32020`),
+  `-32022` with the supported versions, `resultType` + `serverInfo` `_meta` on
+  every result (merged with any app `_meta`), `ttlMs`/`cacheScope` on lists
   (`private` for `tools/list`, which depends on the token's scopes), 404 for
   unknown methods. Other requests get the legacy behavior below.
 - Streamable HTTP, **stateless**: no `Mcp-Session-Id`. Requests are answered
-  with `application/json`; POSTs carrying only notifications/responses get
-  `202` with no body. GET/DELETE `/mcp` → 405 (no server-initiated SSE).
+  with `application/json`; POSTs carrying only notifications/responses get `202`
+  with no body. GET/DELETE `/mcp` → 405 (no server-initiated SSE).
 - Methods: `initialize`, `notifications/initialized`, `ping`, `tools/list`,
   `tools/call`. Capabilities advertised: `tools` only.
 - Protocol version negotiation: echo the client's version if supported
@@ -113,44 +119,42 @@ Two credential kinds, one `tokens` table (stores SHA-256 hash only):
 1. **OAuth 2.1** (what claude.ai / ChatGPT connectors need)
    - DCR, public clients (`token_endpoint_auth_method: none`), PKCE S256
      required, exact redirect_uri match.
-   - `/authorize` validates client + redirect, stores an `authRequest`
-     (10 min TTL), redirects to `consentUrl?request=<id>`.
+   - `/authorize` validates client + redirect, stores an `authRequest` (10 min
+     TTL), redirects to `consentUrl?request=<id>`.
    - Client ID metadata documents (2025-11-25) only for allowlisted hosts:
      Convex `fetch` can't pin resolved IPs, so open CIMD would be an SSRF.
    - The app's consent page (user signed in with the app's own auth) calls
      `getAuthRequest` (client name, redirect host, scopes) and then
-     `authorize({ approve })`, an **action** that generates the code and
-     settles the request in one mutation:
-     generates code, stores its hash bound to `{userId, client, PKCE
-     challenge, redirect_uri, resource, scopes}`, returns the redirect URL
-     the page navigates to.
+     `authorize({ approve })`, an **action** that generates the code and settles
+     the request in one mutation: generates code, stores its hash bound to
+     `{userId, client, PKCE challenge, redirect_uri, resource, scopes}`, returns
+     the redirect URL the page navigates to.
    - `/token`: code (single use, 60 s TTL; PKCE verified) → access (1 h) +
      refresh (30 d, rotated each use). Rotated refresh tokens are kept as
-     tombstones until they expire, so replaying *any* earlier generation
-     revokes the whole grant.
-   - Code consumption + issuance, and refresh validation + rotation, are
-     each a single mutation.
-   - Every authorization creates a new grant (same client on several machines
-     = several connections).
+     tombstones until they expire, so replaying _any_ earlier generation revokes
+     the whole grant.
+   - Code consumption + issuance, and refresh validation + rotation, are each a
+     single mutation.
+   - Every authorization creates a new grant (same client on several machines =
+     several connections).
    - RFC 8707 `resource` bound to tokens and checked against the server URL.
    - 401s carry `WWW-Authenticate: Bearer resource_metadata="…"`.
-2. **API keys** (Claude Code / Cursor / scripts): `createApiKey` action
-   returns the plaintext once; long-lived until revoked.
+2. **API keys** (Claude Code / Cursor / scripts): `createApiKey` action returns
+   the plaintext once; long-lived until revoked.
 
 3. **Device flow** (RFC 8628), for agents that only have an HTTP tool:
-   `GET /mcp` returns agent-readable instructions; `POST /mcp/oauth/device`
-   with the published public client `mcp-agent` (or a registered client)
-   returns `verification_uri_complete` (the consent page) + a `user_code`;
-   the agent polls the token endpoint (`authorization_pending`,
-   `slow_down` adding 5 s to the stored interval each time,
-   `access_denied`, `expired_token`) and gets an **access token only**.
-   The consent page requires the user to confirm the code. User-code
-   lookups are rate limited per user; device requests have their own
-   bucket. `authRequests` is a union table of redirect and device kinds.
+   `GET /mcp` returns agent-readable instructions; `POST /mcp/oauth/device` with
+   the published public client `mcp-agent` (or a registered client) returns
+   `verification_uri_complete` (the consent page) + a `user_code`; the agent
+   polls the token endpoint (`authorization_pending`, `slow_down` adding 5 s to
+   the stored interval each time, `access_denied`, `expired_token`) and gets an
+   **access token only**. The consent page requires the user to confirm the
+   code. User-code lookups are rate limited per user; device requests have their
+   own bucket. `authRequests` is a union table of redirect and device kinds.
 
-A **grant** row = one connection (user × client). `listConnections` /
-`revoke` let the app render a "Connected agents" settings page; revoking a
-grant kills all its tokens.
+A **grant** row = one connection (user × client). `listConnections` / `revoke`
+let the app render a "Connected agents" settings page; revoking a grant kills
+all its tokens.
 
 Secret generation happens in actions/httpActions (`crypto.getRandomValues`);
 mutations only ever see hashes.
@@ -159,8 +163,8 @@ mutations only ever see hashes.
 contention on hot tokens. `tokens.verify` takes `now` as an argument: a query
 reading `Date.now()` can be served from cache past a token's expiry.
 
-DCR and `/authorize` are rate limited (global / per client). DCR clients
-expire after 24 h unless they complete an authorization.
+DCR and `/authorize` are rate limited (global / per client). DCR clients expire
+after 24 h unless they complete an authorization.
 
 ## Scopes
 
@@ -170,13 +174,13 @@ and rejected on call. Default: single implicit scope, all tools.
 
 ## Cleanup
 
-Component cron hourly: delete expired authRequests/codes/tokens and unused
-DCR clients in bounded batches, rescheduling itself while batches are full.
+Component cron hourly: delete expired authRequests/codes/tokens and unused DCR
+clients in bounded batches, rescheduling itself while batches are full.
 
 ## Not in v1
 
-- SSE streaming / progress notifications / server→client requests
-  (sampling, elicitation) — need a long-lived connection.
+- SSE streaming / progress notifications / server→client requests (sampling,
+  elicitation) — need a long-lived connection.
 - Resources & prompts (API leaves room: `resources:` / `prompts:` options).
 - Open (non-allowlisted) Client ID Metadata Documents.
 - Per-IP rate limiting; rate limiting of the MCP endpoint itself.
@@ -184,10 +188,10 @@ DCR clients in bounded batches, rescheduling itself while batches are full.
 
 ## Review log
 
-Architecture and implementation were reviewed twice with Codex. Changes
-made as a result: 202 for notifications and strict version-header handling;
-a single coherent issuer; pre-dispatch 401/403 challenges; `now` passed into
-token verification; multi-generation refresh replay detection; a grant per
+Architecture and implementation were reviewed twice with Codex. Changes made as
+a result: 202 for notifications and strict version-header handling; a single
+coherent issuer; pre-dispatch 401/403 challenges; `now` passed into token
+verification; multi-generation refresh replay detection; a grant per
 authorization; `returns` enforcement; allowlist-only CIMD with a capped body
 read; DCR/authorize rate limits and expiry of unused clients;
 `tokenIdentifier`/users-table IDs instead of `subject`.

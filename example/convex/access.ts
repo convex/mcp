@@ -38,7 +38,9 @@ export async function roleFor(
   if (list.ownerId === userId) return "owner";
   const member = await ctx.db
     .query("listMembers")
-    .withIndex("list_user", (q) => q.eq("listId", list._id).eq("userId", userId))
+    .withIndex("list_user", (q) =>
+      q.eq("listId", list._id).eq("userId", userId),
+    )
     .unique();
   return member?.role ?? null;
 }
@@ -101,7 +103,8 @@ export async function listsFor(ctx: QueryCtx, actor: Actor) {
     const list = await ctx.db.get("lists", m.listId);
     if (list) shared.push({ list, role: m.role as Role });
   }
-  return [...owned.map((list) => ({ list, role: "owner" as Role })), ...shared].filter(
-    ({ role }) => can(actor, role, "view"),
-  );
+  return [
+    ...owned.map((list) => ({ list, role: "owner" as Role })),
+    ...shared,
+  ].filter(({ role }) => can(actor, role, "view"));
 }

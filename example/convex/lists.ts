@@ -88,7 +88,9 @@ export const join = mutation({
     const role = asEditor ? "editor" : "viewer";
     const member = await ctx.db
       .query("listMembers")
-      .withIndex("list_user", (q) => q.eq("listId", list._id).eq("userId", userId))
+      .withIndex("list_user", (q) =>
+        q.eq("listId", list._id).eq("userId", userId),
+      )
       .unique();
     if (member) await ctx.db.patch("listMembers", member._id, { role });
     else await ctx.db.insert("listMembers", { listId: list._id, userId, role });
@@ -100,7 +102,15 @@ export const join = mutation({
 export const rotateCodes = mutation({
   args: { listId: v.string() },
   handler: async (ctx, args) => {
-    const { list } = await requireList(ctx, await actor(ctx), args.listId, "manage");
-    await ctx.db.patch("lists", list._id, { editorCode: code(), viewerCode: code() });
+    const { list } = await requireList(
+      ctx,
+      await actor(ctx),
+      args.listId,
+      "manage",
+    );
+    await ctx.db.patch("lists", list._id, {
+      editorCode: code(),
+      viewerCode: code(),
+    });
   },
 });

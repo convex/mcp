@@ -13,7 +13,9 @@ export function checkText(text: string) {
   const trimmed = text.trim();
   if (!trimmed) throw new ConvexError("Todo text can't be empty");
   if (trimmed.length > MAX_TEXT_LENGTH) {
-    throw new ConvexError(`Todo text must be at most ${MAX_TEXT_LENGTH} characters`);
+    throw new ConvexError(
+      `Todo text must be at most ${MAX_TEXT_LENGTH} characters`,
+    );
   }
   return trimmed;
 }
@@ -41,7 +43,12 @@ export const list = query({
 export const add = mutation({
   args: { listId: v.string(), text: v.string() },
   handler: async (ctx, args) => {
-    const { list } = await requireList(ctx, await actor(ctx), args.listId, "edit");
+    const { list } = await requireList(
+      ctx,
+      await actor(ctx),
+      args.listId,
+      "edit",
+    );
     return await ctx.db.insert("todos", {
       listId: list._id,
       text: checkText(args.text),

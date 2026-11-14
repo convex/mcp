@@ -12,7 +12,7 @@ it. What makes this different from auditing the app's UI:
    (another user's ID, a huge limit, an unexpected enum) will be sent.
 2. **The agent can be steered by what it reads.** Text returned by your tools
    — especially text other people wrote — can carry instructions. A server
-   that returns untrusted content *and* can send data somewhere is an
+   that returns untrusted content _and_ can send data somewhere is an
    exfiltration path even when every call is individually authorized.
    Annotations and neat result fields do **not** prevent this; only
    server-side policy does.
@@ -57,24 +57,50 @@ otherwise use the script below (adapt sign-in to the app's auth).
 // node prove.mjs — adjust sign-in to the app's auth (this is Convex Auth Anonymous)
 import { ConvexHttpClient } from "convex/browser";
 import { anyApi as api } from "convex/server";
-const CONVEX = process.env.CONVEX_URL, SITE = process.env.SITE_URL;
+const CONVEX = process.env.CONVEX_URL,
+  SITE = process.env.SITE_URL;
 async function user() {
   const c = new ConvexHttpClient(CONVEX);
   const { tokens } = await c.action(api.auth.signIn, { provider: "anonymous" });
   c.setAuth(tokens.token);
   const full = (await c.action(api.mcp.createApiKey, { name: "full" })).apiKey;
-  const ro = (await c.action(api.mcp.createApiKey, { name: "ro", scopes: ["<read scope>"] })).apiKey;
+  const ro = (
+    await c.action(api.mcp.createApiKey, {
+      name: "ro",
+      scopes: ["<read scope>"],
+    })
+  ).apiKey;
   return { c, full, ro };
 }
 const META = "io.modelcontextprotocol/";
 async function mcp(key, method, params = {}) {
-  const res = await fetch(`${SITE}/mcp`, { method: "POST", headers: {
-    Authorization: `Bearer ${key}`, "Content-Type": "application/json",
-    "MCP-Protocol-Version": "2026-07-28", "Mcp-Method": method,
-    ...(params.name ? { "Mcp-Name": params.name } : {}) },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: { ...params,
-      _meta: { [`${META}protocolVersion`]: "2026-07-28", [`${META}clientCapabilities`]: {} } } }) });
-  return { status: res.status, body: await res.json(), bytes: Number(res.headers.get("content-length")) };
+  const res = await fetch(`${SITE}/mcp`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      "MCP-Protocol-Version": "2026-07-28",
+      "Mcp-Method": method,
+      ...(params.name ? { "Mcp-Name": params.name } : {}),
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method,
+      params: {
+        ...params,
+        _meta: {
+          [`${META}protocolVersion`]: "2026-07-28",
+          [`${META}clientCapabilities`]: {},
+        },
+      },
+    }),
+  });
+  return {
+    status: res.status,
+    body: await res.json(),
+    bytes: Number(res.headers.get("content-length")),
+  };
 }
 ```
 
@@ -108,7 +134,8 @@ async function mcp(key, method, params = {}) {
 ```
 
 Severity:
-- **Critical** — proven cross-user *write*, or read of sensitive data
+
+- **Critical** — proven cross-user _write_, or read of sensitive data
   (messages, documents, PII, credentials); acting as another user; account
   takeover; payments or credential theft.
 - **High** — proven cross-user read of low-sensitivity data; a proven

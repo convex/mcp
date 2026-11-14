@@ -30,7 +30,12 @@ function ctx(scopes = ["read", "write"]) {
   } as any;
 }
 
-async function call(s: McpServer, c: any, body: unknown, version = "2025-06-18") {
+async function call(
+  s: McpServer,
+  c: any,
+  body: unknown,
+  version = "2025-06-18",
+) {
   const res = await s.handleMcp(
     c,
     new Request("https://site.example/mcp", {
@@ -44,7 +49,11 @@ async function call(s: McpServer, c: any, body: unknown, version = "2025-06-18")
     }),
   );
   const text = await res.text();
-  return { status: res.status, headers: res.headers, body: text ? JSON.parse(text) : null };
+  return {
+    status: res.status,
+    headers: res.headers,
+    body: text ? JSON.parse(text) : null,
+  };
 }
 
 // `id: null` builds a notification (no id).
@@ -64,16 +73,22 @@ describe("McpServer", () => {
         handler: async () => ({ name: "Ada", passwordHash: "secret" }) as any,
       }),
     });
-    const r = await call(s, ctx(), rpc("tools/call", { name: "whoami", arguments: {} }));
+    const r = await call(
+      s,
+      ctx(),
+      rpc("tools/call", { name: "whoami", arguments: {} }),
+    );
     expect(r.body.result.isError).toBe(true);
     expect(JSON.stringify(r.body)).not.toContain("secret");
   });
 
   test("passes the verified user to handlers, never arguments", async () => {
-    const handler = vi.fn(async (_ctx: unknown, args: { n: bigint }, user: { userId: string }) => ({
-      n: args.n * 2n,
-      user: user.userId,
-    }));
+    const handler = vi.fn(
+      async (_ctx: unknown, args: { n: bigint }, user: { userId: string }) => ({
+        n: args.n * 2n,
+        user: user.userId,
+      }),
+    );
     const s = server({
       double: tool({
         description: "Double",
@@ -82,18 +97,40 @@ describe("McpServer", () => {
         handler,
       }),
     });
-    const r = await call(s, ctx(), rpc("tools/call", { name: "double", arguments: { n: "21" } }));
+    const r = await call(
+      s,
+      ctx(),
+      rpc("tools/call", { name: "double", arguments: { n: "21" } }),
+    );
     expect(r.body.result.structuredContent).toEqual({ n: "42", user: "user1" });
   });
 
   test("ConvexError messages reach the model; other errors don't", async () => {
     const s = server({
-      a: tool({ description: "a", handler: async () => { throw new ConvexError("Nope: try list_x"); } }),
-      b: tool({ description: "b", handler: async () => { throw new Error("db password is hunter2"); } }),
+      a: tool({
+        description: "a",
+        handler: async () => {
+          throw new ConvexError("Nope: try list_x");
+        },
+      }),
+      b: tool({
+        description: "b",
+        handler: async () => {
+          throw new Error("db password is hunter2");
+        },
+      }),
     });
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const a = await call(s, ctx(), rpc("tools/call", { name: "a", arguments: {} }));
-    const b = await call(s, ctx(), rpc("tools/call", { name: "b", arguments: {} }));
+    const a = await call(
+      s,
+      ctx(),
+      rpc("tools/call", { name: "a", arguments: {} }),
+    );
+    const b = await call(
+      s,
+      ctx(),
+      rpc("tools/call", { name: "b", arguments: {} }),
+    );
     spy.mockRestore();
     expect(a.body.result.content[0].text).toBe("Nope: try list_x");
     expect(b.body.result.isError).toBe(true);
@@ -107,16 +144,28 @@ describe("McpServer", () => {
     });
     const list = await call(s, ctx(["read"]), rpc("tools/list"));
     expect(list.body.result.tools.map((t: any) => t.name)).toEqual(["r"]);
-    const denied = await call(s, ctx(["read"]), rpc("tools/call", { name: "w", arguments: {} }));
+    const denied = await call(
+      s,
+      ctx(["read"]),
+      rpc("tools/call", { name: "w", arguments: {} }),
+    );
     expect(denied.status).toBe(403);
     expect(denied.headers.get("WWW-Authenticate")).toContain('scope="write"');
   });
 
   test("protocol: notifications get 202, batches only for 2025-03-26", async () => {
     const s = server({});
-    expect((await call(s, ctx(), rpc("notifications/initialized", undefined, null))).status).toBe(202);
+    expect(
+      (await call(s, ctx(), rpc("notifications/initialized", undefined, null)))
+        .status,
+    ).toBe(202);
     expect((await call(s, ctx(), [rpc("ping")])).status).toBe(400);
-    const batch = await call(s, ctx(), [rpc("ping", {}, 1), rpc("ping", {}, 2)], "2025-03-26");
+    const batch = await call(
+      s,
+      ctx(),
+      [rpc("ping", {}, 1), rpc("ping", {}, 2)],
+      "2025-03-26",
+    );
     expect(batch.body.map((m: any) => m.id)).toEqual([1, 2]);
     const unknown = await call(s, ctx(), rpc("resources/list"));
     expect(unknown.body.error.code).toBe(-32601);
@@ -142,7 +191,10 @@ describe("McpServer", () => {
       ctx(),
       new Request("https://site.example/mcp", {
         method: "POST",
-        headers: { Origin: "https://evil.example", Authorization: "Bearer key" },
+        headers: {
+          Origin: "https://evil.example",
+          Authorization: "Bearer key",
+        },
         body: JSON.stringify(rpc("ping")),
       }),
     );
@@ -151,7 +203,13 @@ describe("McpServer", () => {
 
   test("rejects tools with undeclared scopes", () => {
     expect(() =>
-      server({ x: tool({ description: "x", scope: "admin", handler: async () => null }) }),
+      server({
+        x: tool({
+          description: "x",
+          scope: "admin",
+          handler: async () => null,
+        }),
+      }),
     ).toThrow(/scope "admin"/);
   });
 });
@@ -178,10 +236,17 @@ describe("MCP 2026-07-28 (stateless)", () => {
           "Content-Type": "application/json",
           "MCP-Protocol-Version": "2026-07-28",
           "Mcp-Method": method,
-          ...(typeof params.name === "string" ? { "Mcp-Name": params.name } : {}),
+          ...(typeof params.name === "string"
+            ? { "Mcp-Name": params.name }
+            : {}),
           ...headers,
         },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: { ...params, _meta: meta } }),
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method,
+          params: { ...params, _meta: meta },
+        }),
       }),
     );
     const text = await res.text();
@@ -211,9 +276,15 @@ describe("MCP 2026-07-28 (stateless)", () => {
 
   test("tools/list and tools/call carry resultType and cache hints", async () => {
     const list = await modern(s(), "tools/list");
-    expect(list.body.result).toMatchObject({ resultType: "complete", cacheScope: "private" });
+    expect(list.body.result).toMatchObject({
+      resultType: "complete",
+      cacheScope: "private",
+    });
     expect(list.body.result.ttlMs).toBeGreaterThan(0);
-    const call = await modern(s(), "tools/call", { name: "echo", arguments: { text: "hi" } });
+    const call = await modern(s(), "tools/call", {
+      name: "echo",
+      arguments: { text: "hi" },
+    });
     expect(call.body.result).toMatchObject({
       resultType: "complete",
       structuredContent: { text: "hi" },
@@ -229,7 +300,12 @@ describe("MCP 2026-07-28 (stateless)", () => {
     );
     expect(wrongName.status).toBe(400);
     expect(wrongName.body.error.code).toBe(-32020);
-    const wrongMethod = await modern(s(), "tools/list", {}, { "Mcp-Method": "tools/call" });
+    const wrongMethod = await modern(
+      s(),
+      "tools/list",
+      {},
+      { "Mcp-Method": "tools/call" },
+    );
     expect(wrongMethod.body.error.code).toBe(-32020);
     // Base64 sentinel values are decoded before comparing.
     const encoded = await modern(
@@ -246,19 +322,28 @@ describe("MCP 2026-07-28 (stateless)", () => {
       ctx(),
       new Request("https://site.example/mcp", {
         method: "POST",
-        headers: { Authorization: "Bearer key", "MCP-Protocol-Version": "2099-01-01", "Mcp-Method": "tools/list" },
+        headers: {
+          Authorization: "Bearer key",
+          "MCP-Protocol-Version": "2099-01-01",
+          "Mcp-Method": "tools/list",
+        },
         body: JSON.stringify({
           jsonrpc: "2.0",
           id: 1,
           method: "tools/list",
-          params: { _meta: { ...meta, [`${META}protocolVersion`]: "2099-01-01" } },
+          params: {
+            _meta: { ...meta, [`${META}protocolVersion`]: "2099-01-01" },
+          },
         }),
       }),
     );
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error.code).toBe(-32022);
-    expect(body.error.data).toMatchObject({ requested: "2099-01-01", supported: expect.arrayContaining(["2026-07-28"]) });
+    expect(body.error.data).toMatchObject({
+      requested: "2099-01-01",
+      supported: expect.arrayContaining(["2026-07-28"]),
+    });
   });
 
   test("missing required _meta is -32602 / 400; unknown methods 404", async () => {
@@ -266,8 +351,17 @@ describe("MCP 2026-07-28 (stateless)", () => {
       ctx(),
       new Request("https://site.example/mcp", {
         method: "POST",
-        headers: { Authorization: "Bearer key", "MCP-Protocol-Version": "2026-07-28", "Mcp-Method": "tools/list" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+        headers: {
+          Authorization: "Bearer key",
+          "MCP-Protocol-Version": "2026-07-28",
+          "Mcp-Method": "tools/list",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/list",
+          params: {},
+        }),
       }),
     );
     expect(res.status).toBe(400);
@@ -294,7 +388,10 @@ describe("MCP 2026-07-28 (stateless)", () => {
       "com.example/category": "charts",
     });
     // Both the app's keys and the server's identity are present: merge, not replace.
-    const res = await modern(srv, "tools/call", { name: "styled", arguments: {} });
+    const res = await modern(srv, "tools/call", {
+      name: "styled",
+      arguments: {},
+    });
     expect(res.body.result._meta).toEqual({
       "com.example/theme": "dark",
       [`${META}serverInfo`]: { name: "test", version: "1" },
@@ -302,10 +399,20 @@ describe("MCP 2026-07-28 (stateless)", () => {
   });
 
   test("legacy clients still initialize", async () => {
-    const r = await call(s(), ctx(), rpc("initialize", { protocolVersion: "2025-11-25" }), "2025-11-25");
+    const r = await call(
+      s(),
+      ctx(),
+      rpc("initialize", { protocolVersion: "2025-11-25" }),
+      "2025-11-25",
+    );
     expect(r.body.result.protocolVersion).toBe("2025-11-25");
     // A legacy client asking for an unknown version gets the latest legacy one.
-    const r2 = await call(s(), ctx(), rpc("initialize", { protocolVersion: "2026-07-28" }), "2025-06-18");
+    const r2 = await call(
+      s(),
+      ctx(),
+      rpc("initialize", { protocolVersion: "2026-07-28" }),
+      "2025-06-18",
+    );
     expect(r2.body.result.protocolVersion).toBe("2025-11-25");
   });
 });
@@ -338,7 +445,11 @@ describe("_meta", () => {
   });
 
   test("a tool result _meta reaches the client", async () => {
-    const r = await call(withMeta(), ctx(), rpc("tools/call", { name: "show", arguments: {} }));
+    const r = await call(
+      withMeta(),
+      ctx(),
+      rpc("tools/call", { name: "show", arguments: {} }),
+    );
     expect(r.body.result._meta).toEqual(appMeta);
     expect(r.body.result.content).toEqual([{ type: "text", text: "ok" }]);
   });
@@ -358,7 +469,11 @@ describe("callToolResult", () => {
       }),
     });
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const r = await call(s, ctx(), rpc("tools/call", { name: "leak", arguments: {} }));
+    const r = await call(
+      s,
+      ctx(),
+      rpc("tools/call", { name: "leak", arguments: {} }),
+    );
     spy.mockRestore();
     expect(r.body.result.isError).toBe(true);
     expect(JSON.stringify(r.body)).not.toContain("secret");
@@ -376,22 +491,30 @@ describe("lint", () => {
     });
     const findings = bare.lint();
     expect(findings.some((f) => f.includes("No `scopes`"))).toBe(true);
-    expect(findings.some((f) => f.includes('"t" has no annotations'))).toBe(true);
+    expect(findings.some((f) => f.includes('"t" has no annotations'))).toBe(
+      true,
+    );
   });
 
   test("vMcpUser validates the user passed to internal functions", async () => {
     const { vMcpUser } = await import("./index.js");
     const { checkValue } = await import("./schema.js");
     const validator = vMcpUser();
-    expect(checkValue(validator, { userId: "u", scopes: [], connectionId: "c" }).ok).toBe(true);
+    expect(
+      checkValue(validator, { userId: "u", scopes: [], connectionId: "c" }).ok,
+    ).toBe(true);
     expect(checkValue(validator, { userId: "u" }).ok).toBe(false);
   });
 });
 
 describe("GET /mcp guide", () => {
-
   test("explains device sign-in; hides tools unless describeTools", async () => {
-    const s = server({ secret_tool: tool({ description: "Internal thing", handler: async () => null }) });
+    const s = server({
+      secret_tool: tool({
+        description: "Internal thing",
+        handler: async () => null,
+      }),
+    });
     const text = s.guide();
     expect(text).toContain("client_id=mcp-agent");
     expect(text).toContain("https://site.example/mcp/oauth/device");
@@ -402,7 +525,12 @@ describe("GET /mcp guide", () => {
       consentUrl: "https://app.example/connect",
       siteUrl: "https://site.example",
       describeTools: true,
-      tools: { secret_tool: tool({ description: "Internal thing", handler: async () => null }) },
+      tools: {
+        secret_tool: tool({
+          description: "Internal thing",
+          handler: async () => null,
+        }),
+      },
     });
     expect(open.guide()).toContain("secret_tool");
   });

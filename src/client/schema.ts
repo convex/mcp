@@ -83,8 +83,7 @@ export function toJsonSchema(validator: GenericValidator): JSONSchema {
 }
 
 export type CheckResult =
-  | { ok: true; value: unknown }
-  | { ok: false; error: string };
+  { ok: true; value: unknown } | { ok: false; error: string };
 
 /**
  * Checks `value` against a validator and converts JSON encodings (int64
@@ -114,9 +113,7 @@ export function checkValue(
       }
       return fail("an integer");
     case "boolean":
-      return typeof value === "boolean"
-        ? { ok: true, value }
-        : fail("boolean");
+      return typeof value === "boolean" ? { ok: true, value } : fail("boolean");
     case "string":
     case "id":
       return typeof value === "string" ? { ok: true, value } : fail("string");

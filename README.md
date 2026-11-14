@@ -4,11 +4,11 @@
 
 <!-- START: Include on https://convex.dev/components -->
 
-Let your users use your app from their AI agents. This component turns a
-Convex app into a remote [MCP](https://modelcontextprotocol.io) server with
-sign-in built in. Your users paste one URL into Claude, ChatGPT, Cursor or
-Claude Code, approve the agent on a page in your app, and the agent can then
-work with **their** data through tools you define.
+Let your users use your app from their AI agents. This component turns a Convex
+app into a remote [MCP](https://modelcontextprotocol.io) server with sign-in
+built in. Your users paste one URL into Claude, ChatGPT, Cursor or Claude Code,
+approve the agent on a page in your app, and the agent can then work with
+**their** data through tools you define.
 
 ```ts
 export const mcp = new McpServer(components.mcp, {
@@ -36,22 +36,21 @@ export const mcp = new McpServer(components.mcp, {
   available as an opt-in for hosts you allowlist.
 - **Paste the URL into any agent chat.** An agent that can only make HTTP
   requests fetches `/mcp` and gets instructions. It then shows the user a
-  clickable approval link, gets a short-lived token, and starts calling
-  tools. No MCP client setup is needed. This uses the OAuth device flow,
-  RFC 8628.
-- **Your auth, your consent page.** Users sign in with whatever your app
-  already uses (Convex Auth, Clerk, WorkOS, …), then approve the agent.
+  clickable approval link, gets a short-lived token, and starts calling tools.
+  No MCP client setup is needed. This uses the OAuth device flow, RFC 8628.
+- **Your auth, your consent page.** Users sign in with whatever your app already
+  uses (Convex Auth, Clerk, WorkOS, …), then approve the agent.
 - **Connections UI.** Users can list connected agents, disconnect them, and
   create API keys for CLI agents.
 - **Scopes.** You can let users connect a read-only agent.
 - **Secrets are stored hashed.** Tokens are opaque and stored as SHA-256 only.
-  Expired credentials and unused client registrations are cleaned up by a
-  cron, and the unauthenticated endpoints are rate limited.
+  Expired credentials and unused client registrations are cleaned up by a cron,
+  and the unauthenticated endpoints are rate limited.
 
-Speaks MCP **2026-07-28** (stateless, with `server/discover`, no
-`initialize`) and the earlier 2025-11-25, 2025-06-18 and 2025-03-26 versions
-on the same endpoint, over Streamable HTTP. Everything runs inside your
-Convex deployment: no separate server or auth provider.
+Speaks MCP **2026-07-28** (stateless, with `server/discover`, no `initialize`)
+and the earlier 2025-11-25, 2025-06-18 and 2025-03-26 versions on the same
+endpoint, over Streamable HTTP. Everything runs inside your Convex deployment:
+no separate server or auth provider.
 
 Found a bug? Feature request?
 [File it here](https://github.com/convex/mcp/issues).
@@ -112,17 +111,17 @@ app.use(mcp);
 export default app;
 ```
 
-> The MCP and OAuth discovery routes are served from your app's HTTP router
-> at the origin root (`/.well-known/...`). Don't give the app itself an
+> The MCP and OAuth discovery routes are served from your app's HTTP router at
+> the origin root (`/.well-known/...`). Don't give the app itself an
 > `httpPrefix`.
 
 ## Usage
 
 ### 1. Define the server and tools
 
-Tool handlers run in an HTTP action. There's no `ctx.auth` identity there:
-the verified user comes in as `user.userId`. Pass it to internal functions,
-and check ownership there just like your UI code does.
+Tool handlers run in an HTTP action. There's no `ctx.auth` identity there: the
+verified user comes in as `user.userId`. Pass it to internal functions, and
+check ownership there just like your UI code does.
 
 ```ts
 // convex/mcp.ts
@@ -149,7 +148,9 @@ export const mcp = new McpServer(components.mcp, {
       description: "List the user's todos, optionally filtered by completion.",
       args: { done: v.optional(v.boolean()) },
       returns: v.object({
-        todos: v.array(v.object({ id: v.string(), text: v.string(), done: v.boolean() })),
+        todos: v.array(
+          v.object({ id: v.string(), text: v.string(), done: v.boolean() }),
+        ),
       }),
       annotations: { readOnlyHint: true },
       scope: "todos:read",
@@ -173,8 +174,8 @@ export const {
 } = mcp.api({ getUserId: getAuthUserId });
 ```
 
-For the CLI and tests, also export the internal helpers. They can only be
-called with deploy credentials:
+For the CLI and tests, also export the internal helpers. They can only be called
+with deploy credentials:
 
 ```ts
 export const { createApiKeyForUser } = mcp.internalApi();
@@ -206,25 +207,25 @@ mcp.registerRoutes(http);
 export default http;
 ```
 
-Your MCP server URL is `https://<deployment>.convex.site/mcp`. Two URLs are
-easy to confuse:
+Your MCP server URL is `https://<deployment>.convex.site/mcp`. Two URLs are easy
+to confuse:
 
 - `consentUrl` is the page on your **frontend** where users approve agents.
-- `siteUrl` is the public origin of your **Convex HTTP actions**, which is
-  the server URL users paste. It defaults to `CONVEX_SITE_URL`. Pass it if
-  you use a custom domain for HTTP actions.
+- `siteUrl` is the public origin of your **Convex HTTP actions**, which is the
+  server URL users paste. It defaults to `CONVEX_SITE_URL`. Pass it if you use a
+  custom domain for HTTP actions.
 
-Every authorization creates its own connection, so a user can connect the
-same agent on several machines.
+Every authorization creates its own connection, so a user can connect the same
+agent on several machines.
 
 ### 3. Add a consent page
 
-When an agent connects, the user is sent to `consentUrl?request=<id>`. On
-that page, make sure the user is signed in (coming back to the same URL
-afterwards), show who's asking, and let them decide. Don't let it be
-framed: send `Content-Security-Policy: frame-ancestors 'none'` where your
-host can. On static hosts that can't set headers, refuse to render the
-approval UI when `window.top !== window.self`. The example does both.
+When an agent connects, the user is sent to `consentUrl?request=<id>`. On that
+page, make sure the user is signed in (coming back to the same URL afterwards),
+show who's asking, and let them decide. Don't let it be framed: send
+`Content-Security-Policy: frame-ancestors 'none'` where your host can. On static
+hosts that can't set headers, refuse to render the approval UI when
+`window.top !== window.self`. The example does both.
 
 ```tsx
 const requestId = new URLSearchParams(location.search).get("request")!;
@@ -240,34 +241,34 @@ const decide = async (approve: boolean) => {
 
 #### Agents that started from a pasted URL (device flow)
 
-An agent with only an HTTP tool can fetch `GET /mcp`, which returns
-step-by-step instructions, and sign in with the device flow, using the
-public client ID `mcp-agent`. The user gets a link to your consent page,
-`consentUrl?request=…`. For these requests, `getAuthRequest` returns
-`kind: "device"` and a `userCode`. Your consent page should:
+An agent with only an HTTP tool can fetch `GET /mcp`, which returns step-by-step
+instructions, and sign in with the device flow, using the public client ID
+`mcp-agent`. The user gets a link to your consent page, `consentUrl?request=…`.
+For these requests, `getAuthRequest` returns `kind: "device"` and a `userCode`.
+Your consent page should:
 
-- show the `userCode` and **require** the user to confirm it matches what
-  their agent shows (a checkbox) before enabling Allow, then pass it to
-  `authorize({ requestId, approve: true, userCode })`. The server refuses
-  device approvals without the matching code, so a consent page that skips
-  this step fails safely instead of becoming a phishing hole;
+- show the `userCode` and **require** the user to confirm it matches what their
+  agent shows (a checkbox) before enabling Allow, then pass it to
+  `authorize({ requestId, approve: true, userCode })`. The server refuses device
+  approvals without the matching code, so a consent page that skips this step
+  fails safely instead of becoming a phishing hole;
 - label `clientName` as unverified, since the agent reports it about itself;
-- after `authorize`, which returns `redirectUrl: null` for device requests,
-  tell the user to go back to their agent;
+- after `authorize`, which returns `redirectUrl: null` for device requests, tell
+  the user to go back to their agent;
 - if opened without `?request=`, offer a box to type the code, which calls
   `findAuthRequest({ userCode })`. That lookup is rate-limited per user.
 
 Device-flow tokens are short-lived access tokens with **no refresh token**,
 since they may end up in chat transcripts. The tool list isn't shown on the
-public guide unless you set `describeTools: true`. Set `deviceFlow: false`
-to turn the feature off. The example consent page
+public guide unless you set `describeTools: true`. Set `deviceFlow: false` to
+turn the feature off. The example consent page
 ([`example/src/App.tsx`](./example/src/App.tsx)) implements all of this.
 
 ### 4. Show connected agents
 
 Settings can use `listConnections`, `revokeConnection({ id })` and
-`createApiKey({ name })`. The API key is returned once. CLI agents use it as
-a bearer token:
+`createApiKey({ name })`. The API key is returned once. CLI agents use it as a
+bearer token:
 
 ```sh
 claude mcp add --transport http todos https://<deployment>.convex.site/mcp \
@@ -279,47 +280,45 @@ connections UI.
 
 ### Tool results
 
-- **Return values.** A string becomes text content. Any other value becomes
-  JSON text content, plus `structuredContent` when `returns` is set and the
-  value is an object. `bigint` values are encoded as strings and bytes as
-  base64.
-- **`returns` is enforced.** A result that doesn't match it, including one
-  with extra fields, is logged and becomes a generic tool error. Nothing you
-  didn't declare reaches the agent.
+- **Return values.** A string becomes text content. Any other value becomes JSON
+  text content, plus `structuredContent` when `returns` is set and the value is
+  an object. `bigint` values are encoded as strings and bytes as base64.
+- **`returns` is enforced.** A result that doesn't match it, including one with
+  extra fields, is logged and becomes a generic tool error. Nothing you didn't
+  declare reaches the agent.
 - **Full control.** Return `callToolResult({ content: [...], isError })` to
   shape the result yourself, for example to return images.
 - **`_meta`.** Attach app metadata with `meta` on a tool (advertised in
-  `tools/list`) or `_meta` on a `callToolResult` (returned with the result).
-  It is opaque to the component: MCP reserves `_meta` for metadata on any
-  object, and only keys with MCP-reserved prefixes (e.g.
-  `io.modelcontextprotocol/`) are protocol-owned. On MCP 2026-07-28 it is
-  merged with the server's `serverInfo`.
+  `tools/list`) or `_meta` on a `callToolResult` (returned with the result). It
+  is opaque to the component: MCP reserves `_meta` for metadata on any object,
+  and only keys with MCP-reserved prefixes (e.g. `io.modelcontextprotocol/`) are
+  protocol-owned. On MCP 2026-07-28 it is merged with the server's `serverInfo`.
 - **Errors.** Throw `ConvexError("…")` to send the model a message it can act
   on. Other errors are logged, and the model gets a generic failure.
 
 ### Scopes
 
-Give a tool `scope: "x"` (it must be a key of `scopes`). A connection only
-sees and can call tools in its granted scopes. A call outside those scopes
-gets HTTP 403 `insufficient_scope`. When a client requests no scope, the
-connection gets all of them.
+Give a tool `scope: "x"` (it must be a key of `scopes`). A connection only sees
+and can call tools in its granted scopes. A call outside those scopes gets HTTP
+403 `insufficient_scope`. When a client requests no scope, the connection gets
+all of them.
 
 ## Authorization
 
 The component authenticates the connection and gives your tool the verified
 `user` (`userId`, plus the connection's `scopes`, `clientId` and
-`connectionId`). **Deciding what that user may do is your app's job.** Do it
-the same way your UI does, inside the transaction that reads or writes:
+`connectionId`). **Deciding what that user may do is your app's job.** Do it the
+same way your UI does, inside the transaction that reads or writes:
 
 1. **Use one access helper for the UI and for MCP.** Put the check in a function
-   like `requireList(ctx, actor, listId, "view" | "edit" | "manage")`. Call
-   it from your UI mutations *and* from the internal functions your tools
-   call, so the two paths can't drift apart. Return the same error for "not
-   found" and "not allowed".
+   like `requireList(ctx, actor, listId, "view" | "edit" | "manage")`. Call it
+   from your UI mutations _and_ from the internal functions your tools call, so
+   the two paths can't drift apart. Return the same error for "not found" and
+   "not allowed".
 2. **Pass the whole MCP user, not just the ID.** Internal functions take
-   `{ user: vMcpUser(v.id("users")) }`. Your helper can then let a
-   connection's scopes **narrow** what the user may do. For example, a
-   `todos:read` connection acts as a viewer even on the user's own list.
+   `{ user: vMcpUser(v.id("users")) }`. Your helper can then let a connection's
+   scopes **narrow** what the user may do. For example, a `todos:read`
+   connection acts as a viewer even on the user's own list.
 3. **Plug in whatever already decides access in your app:**
    - **Your own tables**, such as owners, members and roles. The example
      ([`example/convex/access.ts`](./example/convex/access.ts)) shares lists
@@ -327,13 +326,13 @@ the same way your UI does, inside the transaction that reads or writes:
    - **A sharing or authorization component.** Call its transactional check,
      such as `requireAccess(ctx, { resourceRef, actor }, "edit")`, from your
      helper.
-   - **An external engine** (OpenFGA, Cerbos, WorkOS FGA). These can't be
-     called from a query or mutation, which can't make network requests.
-     Copy the relationships you need into indexed Convex tables, check those
-     inside the transaction, and keep them in sync from actions or webhooks.
-     Calling the engine from an action and then writing in a separate
-     mutation leaves a gap between the check and the write. Only do that if
-     a short delay in revocation is acceptable.
+   - **An external engine** (OpenFGA, Cerbos, WorkOS FGA). These can't be called
+     from a query or mutation, which can't make network requests. Copy the
+     relationships you need into indexed Convex tables, check those inside the
+     transaction, and keep them in sync from actions or webhooks. Calling the
+     engine from an action and then writing in a separate mutation leaves a gap
+     between the check and the write. Only do that if a short delay in
+     revocation is acceptable.
 4. **Lists and searches** should query what the user can reach (owned plus
    shared, through an index), not fetch everything and then filter.
 
@@ -341,33 +340,30 @@ the same way your UI does, inside the transaction that reads or writes:
 
 Before you ship, make sure that:
 
-- [ ] **Tools act only as `user.userId`.** No tool argument decides whose
-      data is touched.
+- [ ] **Tools act only as `user.userId`.** No tool argument decides whose data
+      is touched.
 - [ ] **The functions tools call are `internal*`.** A public function that
       trusts a `userId` argument can be called by anyone.
-- [ ] **Every ID from the model is checked for access** with the same
-      helper your UI uses, including IDs of child objects.
-- [ ] **Every tool that returns an object declares `returns`.** It's
-      enforced, so it is also the allowlist of fields that reach the agent.
-- [ ] **Reads and writes have separate scopes,** and every tool is
-      annotated (`readOnlyHint`, `destructiveHint`, `openWorldHint`).
-- [ ] **Tools that send data out are behind a server-side policy,** such as
-      a recipient allowlist or confirmation in your app, if your server also
+- [ ] **Every ID from the model is checked for access** with the same helper
+      your UI uses, including IDs of child objects.
+- [ ] **Every tool that returns an object declares `returns`.** It's enforced,
+      so it is also the allowlist of fields that reach the agent.
+- [ ] **Reads and writes have separate scopes,** and every tool is annotated
+      (`readOnlyHint`, `destructiveHint`, `openWorldHint`).
+- [ ] **Tools that send data out are behind a server-side policy,** such as a
+      recipient allowlist or confirmation in your app, if your server also
       returns text written by other people. Annotations don't stop prompt
       injection.
-- [ ] **The consent page can't be framed** (with a `frame-ancestors`
-      header, or the in-page check on static hosts) and labels client
-      names as unverified.
-- [ ] **For device-flow requests, the consent page shows the user code**
-      and requires the user to confirm it matches, before Allow is
-      enabled.
-- [ ] **`expect(mcp.lint()).toEqual([])` passes in a test.** `lint()`
-      flags missing scopes, missing annotations and inconsistent scopes. It
-      also logs once, on the first MCP request, unless you set
-      `warnings: false`.
+- [ ] **The consent page can't be framed** (with a `frame-ancestors` header, or
+      the in-page check on static hosts) and labels client names as unverified.
+- [ ] **For device-flow requests, the consent page shows the user code** and
+      requires the user to confirm it matches, before Allow is enabled.
+- [ ] **`expect(mcp.lint()).toEqual([])` passes in a test.** `lint()` flags
+      missing scopes, missing annotations and inconsistent scopes. It also logs
+      once, on the first MCP request, unless you set `warnings: false`.
 
-Then run the security audit skill (prompt above), which proves each item
-live with two users.
+Then run the security audit skill (prompt above), which proves each item live
+with two users.
 
 ## Designing your tools
 
@@ -377,8 +373,8 @@ This package ships two agent skills:
   (names, descriptions, args, scopes, annotations) before wiring it up.
 - `skills/convex-mcp-security` audits an app's MCP server — identity, cross-user
   access, public functions taking `userId`, data in results, prompt-injection
-  and exfiltration paths, the consent page — proving each finding with two
-  real users.
+  and exfiltration paths, the consent page — proving each finding with two real
+  users.
 
 ```sh
 npx skills add convex/mcp
@@ -392,7 +388,11 @@ import mcpTest from "@convex-dev/mcp/test";
 
 const t = convexTest(schema, modules);
 mcpTest.register(t); // or mcpTest.register(t, "myMcp") for a custom name
-const res = await t.fetch("/mcp", { method: "POST", headers: { Authorization: `Bearer ${apiKey}` }, body });
+const res = await t.fetch("/mcp", {
+  method: "POST",
+  headers: { Authorization: `Bearer ${apiKey}` },
+  body,
+});
 ```
 
 `register` also registers the bundled rate limiter. Set
@@ -403,15 +403,15 @@ const res = await t.fetch("/mcp", { method: "POST", headers: { Authorization: `B
 - **Short tool calls.** Each tool call is a single HTTP action, so it has
   Convex's action time and memory limits. Keep calls short and return small
   results.
-- **Device flow and the pasted-URL guide** are on by default. Turn them off
-  with `deviceFlow: false`.
-- **Not yet supported:** server-to-client streaming (SSE progress,
-  sampling, elicitation), resources and prompts, and confidential clients.
+- **Device flow and the pasted-URL guide** are on by default. Turn them off with
+  `deviceFlow: false`.
+- **Not yet supported:** server-to-client streaming (SSE progress, sampling,
+  elicitation), resources and prompts, and confidential clients.
 - **Rate limiting.** Client registration and `/authorize` are rate limited
   through a bundled `@convex-dev/rate-limiter` instance. Limits are global or
   per client, not per IP. The MCP endpoint itself isn't rate limited yet.
-- **Client ID metadata documents** are fetched from your backend, so they
-  only work for hosts you list in `clientMetadataDocumentHosts`.
+- **Client ID metadata documents** are fetched from your backend, so they only
+  work for hosts you list in `clientMetadataDocumentHosts`.
 
 <!-- END: Include on https://convex.dev/components -->
 

@@ -37,7 +37,11 @@ export const mcp: McpServer<Id<"users">> = new McpServer(components.mcp, {
           v.object({
             id: v.string(),
             name: v.string(),
-            role: v.union(v.literal("owner"), v.literal("editor"), v.literal("viewer")),
+            role: v.union(
+              v.literal("owner"),
+              v.literal("editor"),
+              v.literal("viewer"),
+            ),
           }),
         ),
       }),
@@ -59,11 +63,15 @@ export const mcp: McpServer<Id<"users">> = new McpServer(components.mcp, {
       annotations: { readOnlyHint: true, openWorldHint: false },
       scope: "todos:read",
       handler: async (ctx, args, user) => ({
-        todos: await ctx.runQuery(internal.mcpFunctions.todos, { user, ...args }),
+        todos: await ctx.runQuery(internal.mcpFunctions.todos, {
+          user,
+          ...args,
+        }),
       }),
     }),
     add_todo: tool({
-      description: "Add a todo to a list the user can edit. Text is at most 1000 characters.",
+      description:
+        "Add a todo to a list the user can edit. Text is at most 1000 characters.",
       args: { listId: v.string(), text: v.string() },
       returns: todo,
       annotations: { destructiveHint: false, openWorldHint: false },
@@ -75,7 +83,11 @@ export const mcp: McpServer<Id<"users">> = new McpServer(components.mcp, {
       description: "Mark a todo as done or not done.",
       args: { id: v.string(), done: v.boolean() },
       returns: todo,
-      annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
       scope: "todos:write",
       handler: (ctx, args, user) =>
         ctx.runMutation(internal.mcpFunctions.setDone, { user, ...args }),
