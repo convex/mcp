@@ -81,6 +81,17 @@ export const { getAuthRequest, authorize, listConnections, revokeConnection,
 - `userId` is always from the verified token; tool handlers never trust
   arguments for identity.
 
+## Resources
+
+`resources` maps URIs to `{ name, title?, description?, mimeType?, meta?,
+scope?, handler(ctx, user) }`. Static resources only: no templates and no
+subscriptions (no long-lived connection to notify on). `resources/list`,
+`resources/templates/list` (always empty) and `resources/read` are answered
+only when `resources` is non-empty, which is also when the capability is
+advertised; otherwise they stay `-32601`, as before. Scopes work as for tools.
+A missing resource is `-32602` on 2026-07-28 and `-32002` before it. Handler
+errors are `-32603`, with `ConvexError` messages passed through.
+
 ## Protocol
 
 - **Dual-era.** Requests carrying `_meta["io.modelcontextprotocol/protocolVersion"]`
@@ -89,13 +100,16 @@ export const { getAuthRequest, authorize, listConnections, revokeConnection,
   the body (`-32020`), `-32022` with the supported versions, `resultType` +
   `serverInfo` `_meta` on every result (merged with any app `_meta`),
   `ttlMs`/`cacheScope` on lists
-  (`private` for `tools/list`, which depends on the token's scopes), 404 for
+  (`private` for `tools/list` and `resources/list`, which depend on the
+  token's scopes), 404 for
   unknown methods. Other requests get the legacy behavior below.
 - Streamable HTTP, **stateless**: no `Mcp-Session-Id`. Requests are answered
   with `application/json`; POSTs carrying only notifications/responses get
   `202` with no body. GET/DELETE `/mcp` → 405 (no server-initiated SSE).
 - Methods: `initialize`, `notifications/initialized`, `ping`, `tools/list`,
-  `tools/call`. Capabilities advertised: `tools` only.
+  `tools/call`, and `resources/list`, `resources/templates/list` and
+  `resources/read` when the app defines resources. Capabilities advertised:
+  `tools`, plus `resources` when the app defines them.
 - Protocol version negotiation: echo the client's version if supported
   (2025-03-26, 2025-06-18, 2025-11-25) else our latest. A missing
   `MCP-Protocol-Version` header means 2025-03-26; an unsupported one → 400.
@@ -177,7 +191,8 @@ DCR clients in bounded batches, rescheduling itself while batches are full.
 
 - SSE streaming / progress notifications / server→client requests
   (sampling, elicitation) — need a long-lived connection.
-- Resources & prompts (API leaves room: `resources:` / `prompts:` options).
+- Resource templates and subscriptions; prompts (API leaves room: a
+  `prompts:` option).
 - Open (non-allowlisted) Client ID Metadata Documents.
 - Per-IP rate limiting; rate limiting of the MCP endpoint itself.
 - Confidential clients with client secrets.

@@ -3,7 +3,9 @@ import { ConvexError, v } from "convex/values";
 import { McpServer, callToolResult, tool } from "./index.js";
 import { components } from "./setup.test.js";
 
-function server(tools: ConstructorParameters<typeof McpServer>[1]["tools"]) {
+type Options = ConstructorParameters<typeof McpServer>[1];
+
+function server(tools: Options["tools"], resources?: Options["resources"]) {
   return new McpServer(components.mcp, {
     name: "test",
     version: "1",
@@ -11,8 +13,44 @@ function server(tools: ConstructorParameters<typeof McpServer>[1]["tools"]) {
     siteUrl: "https://site.example",
     scopes: { read: "Read", write: "Write" },
     tools,
+    resources,
   });
 }
+
+const CARD = "ui://widgets/card.html";
+const withResources = () =>
+  server(
+    {},
+    {
+      [CARD]: {
+        name: "card",
+        title: "Card",
+        mimeType: "text/html;profile=mcp-app",
+        meta: { "com.example/listed": true },
+        handler: async () => ({
+          text: "<p>card</p>",
+          _meta: { "com.example/read": true },
+        }),
+      },
+      "app://notes/private": {
+        name: "private",
+        scope: "write",
+        handler: async (_ctx, user) => `notes for ${user.userId}`,
+      },
+      "app://broken": {
+        name: "broken",
+        handler: async () => {
+          throw new Error("secret detail");
+        },
+      },
+      "app://refused": {
+        name: "refused",
+        handler: async () => {
+          throw new ConvexError("Not today");
+        },
+      },
+    },
+  );
 
 // A ctx whose token lookup returns a valid connection with `scopes`.
 function ctx(scopes = ["read", "write"]) {
@@ -307,6 +345,112 @@ describe("MCP 2026-07-28 (stateless)", () => {
     // A legacy client asking for an unknown version gets the latest legacy one.
     const r2 = await call(s(), ctx(), rpc("initialize", { protocolVersion: "2026-07-28" }), "2025-06-18");
     expect(r2.body.result.protocolVersion).toBe("2025-11-25");
+  });
+
+  test("resources carry cache hints, serverInfo and -32602 when missing", async () => {
+    const discover = await modern(withResources(), "server/discover");
+    expect(discover.body.result.capabilities.resources).toEqual({ listChanged: false });
+
+    const list = await modern(withResources(), "resources/list");
+    expect(list.body.result).toMatchObject({ resultType: "complete", cacheScope: "private" });
+    expect(list.body.result.ttlMs).toBeGreaterThan(0);
+
+    const read = await modern(withResources(), "resources/read", { uri: CARD }, { "Mcp-Name": CARD });
+    expect(read.body.result).toMatchObject({
+      resultType: "complete",
+      contents: [{ uri: CARD, text: "<p>card</p>" }],
+      _meta: { [`${META}serverInfo`]: { name: "test", version: "1" } },
+    });
+
+    const missing = await modern(
+      withResources(),
+      "resources/read",
+      { uri: "ui://nope" },
+      { "Mcp-Name": "ui://nope" },
+    );
+    expect(missing.body.error).toEqual({
+      code: -32602,
+      message: "Resource not found",
+      data: { uri: "ui://nope" },
+    });
+
+    const wrongName = await modern(withResources(), "resources/read", { uri: CARD }, { "Mcp-Name": "ui://other" });
+    expect(wrongName.body.error.code).toBe(-32020);
+  });
+});
+
+describe("resources", () => {
+  test("the resources capability is advertised only when resources exist", async () => {
+    const init = rpc("initialize", { protocolVersion: "2025-11-25" });
+    const without = await call(server({}), ctx(), init, "2025-11-25");
+    expect(without.body.result.capabilities).toEqual({ tools: { listChanged: false } });
+    const withThem = await call(withResources(), ctx(), init, "2025-11-25");
+    expect(withThem.body.result.capabilities.resources).toEqual({ listChanged: false });
+  });
+
+  test("resources/list advertises listing fields and _meta", async () => {
+    const r = await call(withResources(), ctx(), rpc("resources/list"));
+    expect(r.body.result.resources[0]).toEqual({
+      uri: CARD,
+      name: "card",
+      title: "Card",
+      mimeType: "text/html;profile=mcp-app",
+      _meta: { "com.example/listed": true },
+    });
+    const templates = await call(withResources(), ctx(), rpc("resources/templates/list"));
+    expect(templates.body.result).toEqual({ resourceTemplates: [] });
+  });
+
+  test("resources/read returns contents with the resource's URI, MIME type and _meta", async () => {
+    const r = await call(withResources(), ctx(), rpc("resources/read", { uri: CARD }));
+    expect(r.body.result).toEqual({
+      contents: [
+        {
+          uri: CARD,
+          mimeType: "text/html;profile=mcp-app",
+          text: "<p>card</p>",
+          _meta: { "com.example/read": true },
+        },
+      ],
+    });
+  });
+
+  test("scopes filter resources/list and gate resources/read with 403", async () => {
+    const list = await call(withResources(), ctx(["read"]), rpc("resources/list"));
+    expect(list.body.result.resources.map((r: any) => r.name)).not.toContain("private");
+    const denied = await call(withResources(), ctx(["read"]), rpc("resources/read", { uri: "app://notes/private" }));
+    expect(denied.status).toBe(403);
+    expect(denied.headers.get("WWW-Authenticate")).toContain('scope="write"');
+    // Handlers get the verified user.
+    const allowed = await call(withResources(), ctx(), rpc("resources/read", { uri: "app://notes/private" }));
+    expect(allowed.body.result.contents[0].text).toBe("notes for user1");
+  });
+
+  test("missing resources are -32002 on legacy versions", async () => {
+    const r = await call(withResources(), ctx(), rpc("resources/read", { uri: "ui://nope" }));
+    expect(r.body.error).toEqual({
+      code: -32002,
+      message: "Resource not found",
+      data: { uri: "ui://nope" },
+    });
+  });
+
+  test("ConvexError messages reach the client; other errors don't", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const refused = await call(withResources(), ctx(), rpc("resources/read", { uri: "app://refused" }));
+    expect(refused.body.error).toEqual({ code: -32603, message: "Not today" });
+    const broken = await call(withResources(), ctx(), rpc("resources/read", { uri: "app://broken" }));
+    expect(broken.body.error.code).toBe(-32603);
+    expect(broken.body.error.message).not.toContain("secret detail");
+    errorSpy.mockRestore();
+  });
+
+  test("rejects invalid URIs and undeclared scopes", () => {
+    const handler = async () => "";
+    expect(() => server({}, { "no-scheme": { name: "x", handler } })).toThrow(/Invalid MCP resource URI/);
+    expect(() => server({}, { "app://x": { name: "x", scope: "admin", handler } })).toThrow(
+      /requires scope "admin"/,
+    );
   });
 });
 
