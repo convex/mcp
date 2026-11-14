@@ -19,7 +19,9 @@ export default function App() {
     <main>
       <AuthLoading>Loading…</AuthLoading>
       <Unauthenticated>
-        <SignIn reason={isConsent ? "Sign in to connect your agent." : undefined} />
+        <SignIn
+          reason={isConsent ? "Sign in to connect your agent." : undefined}
+        />
       </Unauthenticated>
       <Authenticated>{isConsent ? <Consent /> : <Home />}</Authenticated>
     </main>
@@ -32,7 +34,9 @@ function SignIn({ reason }: { reason?: string }) {
     <section className="card">
       <h1>Todos</h1>
       <p>{reason ?? "An example app with an MCP server built in."}</p>
-      <button onClick={() => void signIn("anonymous")}>Sign in as a guest</button>
+      <button onClick={() => void signIn("anonymous")}>
+        Sign in as a guest
+      </button>
     </section>
   );
 }
@@ -49,7 +53,10 @@ function Consent() {
     return (
       <section className="card">
         <h1>Open this page directly</h1>
-        <p>For your security, approving an agent can't be done inside another site.</p>
+        <p>
+          For your security, approving an agent can't be done inside another
+          site.
+        </p>
       </section>
     );
   }
@@ -79,11 +86,21 @@ function EnterCode({ onFound }: { onFound: (requestId: string) => void }) {
           e.preventDefault();
           setError(null);
           find({ userCode: code })
-            .then((id) => (id ? onFound(id) : setError("That code isn't valid or has expired.")))
-            .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+            .then((id) =>
+              id
+                ? onFound(id)
+                : setError("That code isn't valid or has expired."),
+            )
+            .catch((err: unknown) =>
+              setError(err instanceof Error ? err.message : String(err)),
+            );
         }}
       >
-        <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="ABCD-EFGH" />
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          placeholder="ABCD-EFGH"
+        />
         <button type="submit">Continue</button>
       </form>
       {error && <p className="error">{error}</p>}
@@ -143,7 +160,8 @@ function Approve({ requestId }: { requestId: string }) {
     <section className="card">
       <h1>Connect an agent?</h1>
       <p>
-        <strong>{name}</strong> <span className="muted">(name not verified)</span> wants to use{" "}
+        <strong>{name}</strong>{" "}
+        <span className="muted">(name not verified)</span> wants to use{" "}
         {request.serverName} on your behalf. It will be able to:
       </p>
       <ul className="scopes">
@@ -154,17 +172,26 @@ function Approve({ requestId }: { requestId: string }) {
       {isDevice ? (
         <>
           <p>
-            Your agent should be showing this code: <code className="usercode">{request.userCode}</code>
+            Your agent should be showing this code:{" "}
+            <code className="usercode">{request.userCode}</code>
           </p>
           <label className="row">
-            <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+            />
             I started this from my own agent, and it shows the same code.
           </label>
           <p className="muted">If someone sent you this link, deny it.</p>
         </>
       ) : (
         <p className="muted">
-          You'll be sent back to <code>{request.redirectUri && new URL(request.redirectUri).host}</code>.
+          You'll be sent back to{" "}
+          <code>
+            {request.redirectUri && new URL(request.redirectUri).host}
+          </code>
+          .
         </p>
       )}
       {error && <p className="error">{error}</p>}
@@ -240,7 +267,11 @@ function Lists() {
               );
           }}
         >
-          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Join a list with a share code" />
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="Join a list with a share code"
+          />
           <button type="submit">Join</button>
         </form>
         {error && <p className="error">{error}</p>}
@@ -269,7 +300,8 @@ function Todos({ list }: { list: ListInfo }) {
       <h2>{list.name}</h2>
       {list.role === "owner" && (
         <p className="muted">
-          Share: editors use <code>{list.editorCode}</code>, viewers use <code>{list.viewerCode}</code>
+          Share: editors use <code>{list.editorCode}</code>, viewers use{" "}
+          <code>{list.viewerCode}</code>
         </p>
       )}
       {canEdit && (
@@ -281,7 +313,11 @@ function Todos({ list }: { list: ListInfo }) {
             setText("");
           }}
         >
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Add a todo" />
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Add a todo"
+          />
           <button type="submit">Add</button>
         </form>
       )}
@@ -299,7 +335,9 @@ function Todos({ list }: { list: ListInfo }) {
             </label>
           </li>
         ))}
-        {todos?.length === 0 && <li className="muted">Nothing yet — ask your agent to add one.</li>}
+        {todos?.length === 0 && (
+          <li className="muted">Nothing yet — ask your agent to add one.</li>
+        )}
       </ul>
     </section>
   );
@@ -315,19 +353,22 @@ function Agents() {
     <section className="card">
       <h2>Use with your agent</h2>
       <p>
-        Add this MCP server URL to Claude, ChatGPT, Cursor or any MCP client. You'll be asked to
-        sign in here and approve it.
+        Add this MCP server URL to Claude, ChatGPT, Cursor or any MCP client.
+        You'll be asked to sign in here and approve it.
       </p>
       <pre>{MCP_URL}</pre>
       <p className="muted">
         For CLIs, create an API key and run{" "}
-        <code>claude mcp add --transport http todos {MCP_URL} --header "Authorization: Bearer &lt;key&gt;"</code>
+        <code>
+          claude mcp add --transport http todos {MCP_URL} --header
+          "Authorization: Bearer &lt;key&gt;"
+        </code>
       </p>
       <button
         onClick={() =>
-          void createApiKey({ name: `API key ${new Date().toLocaleString()}` }).then((r) =>
-            setNewKey(r.apiKey),
-          )
+          void createApiKey({
+            name: `API key ${new Date().toLocaleString()}`,
+          }).then((r) => setNewKey(r.apiKey))
         }
       >
         Create API key
@@ -344,14 +385,21 @@ function Agents() {
             <span>
               <strong>{c.name}</strong>{" "}
               <span className="muted">
-                {c.kind === "apiKey" ? "API key" : "OAuth"} · {c.scopes.join(", ") || "all tools"}
-                {c.lastUsedAt ? ` · last used ${new Date(c.lastUsedAt).toLocaleString()}` : ""}
+                {c.kind === "apiKey" ? "API key" : "OAuth"} ·{" "}
+                {c.scopes.join(", ") || "all tools"}
+                {c.lastUsedAt
+                  ? ` · last used ${new Date(c.lastUsedAt).toLocaleString()}`
+                  : ""}
               </span>
             </span>
-            <button onClick={() => void revoke({ id: c.id })}>Disconnect</button>
+            <button onClick={() => void revoke({ id: c.id })}>
+              Disconnect
+            </button>
           </li>
         ))}
-        {connections?.length === 0 && <li className="muted">No agents connected yet.</li>}
+        {connections?.length === 0 && (
+          <li className="muted">No agents connected yet.</li>
+        )}
       </ul>
     </section>
   );

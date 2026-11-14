@@ -14,12 +14,12 @@ the user names, read it, and do the common writes?
 A good surface for a typical app is **5-15 tools**. More than ~20 hurts tool
 selection; split by scope or drop rarely used ones.
 
-| Instead of | Prefer |
-| --- | --- |
+| Instead of                                        | Prefer                                                             |
+| ------------------------------------------------- | ------------------------------------------------------------------ |
 | `getProject`, `listProjects`, `getTasksByProject` | `list_projects`, `search_tasks({ project?, status?, dueBefore? })` |
-| `createTask` + `assignTask` + `setDueDate` | `create_task({ title, project, assignee?, due? })` |
-| `updateTask({ id, patch: any })` | `update_task({ id, title?, status?, due? })` with explicit fields |
-| exposing `internal.admin.*` | nothing |
+| `createTask` + `assignTask` + `setDueDate`        | `create_task({ title, project, assignee?, due? })`                 |
+| `updateTask({ id, patch: any })`                  | `update_task({ id, title?, status?, due? })` with explicit fields  |
+| exposing `internal.admin.*`                       | nothing                                                            |
 
 ## 2. Make things findable by name
 
@@ -98,16 +98,26 @@ access function for **both** the UI path and the MCP path:
 ```ts
 // convex/access.ts — single source of truth
 export async function requireAccess(
-  ctx: QueryCtx, userId: Id<"users">, bookId: Id<"books">,
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  bookId: Id<"books">,
   need: "view" | "edit" | "admin",
 ) {
   const book = await ctx.db.get("books", bookId);
   if (!book) throw new ConvexError(`No book with id ${bookId}`);
-  const role = book.ownerId === userId ? "admin"
-    : (await ctx.db.query("bookMembers")
-        .withIndex("book_user", (q) => q.eq("bookId", bookId).eq("userId", userId))
-        .unique())?.role;
-  if (!role || rank(role) < rank(need)) throw new ConvexError(`No book with id ${bookId}`);
+  const role =
+    book.ownerId === userId
+      ? "admin"
+      : (
+          await ctx.db
+            .query("bookMembers")
+            .withIndex("book_user", (q) =>
+              q.eq("bookId", bookId).eq("userId", userId),
+            )
+            .unique()
+        )?.role;
+  if (!role || rank(role) < rank(need))
+    throw new ConvexError(`No book with id ${bookId}`);
   return { book, role };
 }
 ```
@@ -127,9 +137,9 @@ export async function requireAccess(
 
 Present this to the user before implementing:
 
-| Tool | Description | Args | Returns | Scope | Annotations |
-| --- | --- | --- | --- | --- | --- |
-| `search_tasks` | Find the user's tasks by text, project or status… | `query?`, `project?`, `status?`, `limit?` | `{ tasks: [{ id, title, project, status, due }] }` | `tasks:read` | readOnly |
+| Tool           | Description                                       | Args                                      | Returns                                            | Scope        | Annotations |
+| -------------- | ------------------------------------------------- | ----------------------------------------- | -------------------------------------------------- | ------------ | ----------- |
+| `search_tasks` | Find the user's tasks by text, project or status… | `query?`, `project?`, `status?`, `limit?` | `{ tasks: [{ id, title, project, status, due }] }` | `tasks:read` | readOnly    |
 
 Then: **left out** (and why), **open questions** (e.g. "should agents be able
 to delete projects?"), and the server `instructions` text.

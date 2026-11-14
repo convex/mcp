@@ -21,8 +21,18 @@ import type {
   VString,
 } from "convex/values";
 import type { ComponentApi } from "../component/_generated/component.js";
-import { randomToken, sha256Base64Url, sha256Hex, TOKEN_PREFIX } from "../shared.js";
-import { checkValue, toJsonSchema, toJsonValue, toObjectValidator } from "./schema.js";
+import {
+  randomToken,
+  sha256Base64Url,
+  sha256Hex,
+  TOKEN_PREFIX,
+} from "../shared.js";
+import {
+  checkValue,
+  toJsonSchema,
+  toJsonValue,
+  toObjectValidator,
+} from "./schema.js";
 import type { JSONSchema } from "./schema.js";
 
 export { toJsonSchema, checkValue } from "./schema.js";
@@ -249,7 +259,11 @@ export type McpServerOptions<UserId extends string = string> = {
  */
 export const MODERN_PROTOCOL_VERSIONS = ["2026-07-28"];
 /** "Legacy" versions start with an `initialize` handshake. */
-export const LEGACY_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26"];
+export const LEGACY_PROTOCOL_VERSIONS = [
+  "2025-11-25",
+  "2025-06-18",
+  "2025-03-26",
+];
 export const PROTOCOL_VERSIONS = [
   ...MODERN_PROTOCOL_VERSIONS,
   ...LEGACY_PROTOCOL_VERSIONS,
@@ -374,16 +388,23 @@ export class McpServer<UserId extends string = string> {
     const p = this.path;
 
     route(p, "POST", (ctx, req) => this.handleMcp(ctx, req));
-    route(p, "GET", async (_ctx, req) => this.mcpCors(req, this.handleGet(req)));
+    route(p, "GET", async (_ctx, req) =>
+      this.mcpCors(req, this.handleGet(req)),
+    );
     route(p, "DELETE", async (_ctx, req) =>
-      this.mcpCors(req, new Response(null, { status: 405, headers: { Allow: "POST" } })),
+      this.mcpCors(
+        req,
+        new Response(null, { status: 405, headers: { Allow: "POST" } }),
+      ),
     );
     route(p, "OPTIONS", async (_ctx, req) =>
       this.mcpCors(req, new Response(null, { status: 204 })),
     );
 
-    const prm = async () => json(this.protectedResourceMetadata(), 200, PUBLIC_CORS);
-    const asm = async () => json(this.authorizationServerMetadata(), 200, PUBLIC_CORS);
+    const prm = async () =>
+      json(this.protectedResourceMetadata(), 200, PUBLIC_CORS);
+    const asm = async () =>
+      json(this.authorizationServerMetadata(), 200, PUBLIC_CORS);
     for (const path of [
       `/.well-known/oauth-protected-resource${p}`,
       `/.well-known/oauth-protected-resource`,
@@ -394,16 +415,24 @@ export class McpServer<UserId extends string = string> {
     route(`/.well-known/oauth-authorization-server`, "GET", asm);
     route(`/.well-known/oauth-authorization-server`, "OPTIONS", preflight);
 
-    route(`${p}/oauth/register`, "POST", (ctx, req) => this.handleRegister(ctx, req));
+    route(`${p}/oauth/register`, "POST", (ctx, req) =>
+      this.handleRegister(ctx, req),
+    );
     route(`${p}/oauth/register`, "OPTIONS", preflight);
-    route(`${p}/oauth/authorize`, "GET", (ctx, req) => this.handleAuthorize(ctx, req));
+    route(`${p}/oauth/authorize`, "GET", (ctx, req) =>
+      this.handleAuthorize(ctx, req),
+    );
     route(`${p}/oauth/token`, "POST", (ctx, req) => this.handleToken(ctx, req));
     if (this.deviceFlow) {
-      route(`${p}/oauth/device`, "POST", (ctx, req) => this.handleDevice(ctx, req));
+      route(`${p}/oauth/device`, "POST", (ctx, req) =>
+        this.handleDevice(ctx, req),
+      );
       route(`${p}/oauth/device`, "OPTIONS", preflight);
     }
     route(`${p}/oauth/token`, "OPTIONS", preflight);
-    route(`${p}/oauth/revoke`, "POST", (ctx, req) => this.handleRevoke(ctx, req));
+    route(`${p}/oauth/revoke`, "POST", (ctx, req) =>
+      this.handleRevoke(ctx, req),
+    );
     route(`${p}/oauth/revoke`, "OPTIONS", preflight);
   }
 
@@ -470,7 +499,8 @@ export class McpServer<UserId extends string = string> {
     const params = [`resource_metadata="${this.resourceMetadataUrl}"`];
     if (error) params.push(`error="${error}"`);
     if (description) params.push(`error_description="${description}"`);
-    if (this.scopeNames.length) params.push(`scope="${this.scopeNames.join(" ")}"`);
+    if (this.scopeNames.length)
+      params.push(`scope="${this.scopeNames.join(" ")}"`);
     return json({ error: error ?? "unauthorized" }, 401, {
       "WWW-Authenticate": `Bearer ${params.join(", ")}`,
     });
@@ -528,7 +558,11 @@ export class McpServer<UserId extends string = string> {
           `Tool "${t.name}" has no \`scope\`, so every connection (even read-only ones) can call it.`,
         );
       }
-      if (d.annotations?.readOnlyHint === true && d.scope && /write|admin|manage/i.test(d.scope)) {
+      if (
+        d.annotations?.readOnlyHint === true &&
+        d.scope &&
+        /write|admin|manage/i.test(d.scope)
+      ) {
         findings.push(
           `Tool "${t.name}" is read-only but requires the write-like scope "${d.scope}"; read-only connections can't use it.`,
         );
@@ -540,7 +574,8 @@ export class McpServer<UserId extends string = string> {
   async handleMcp(ctx: ToolCtx, request: Request): Promise<Response> {
     if (!this.warned && this.options.warnings !== false) {
       this.warned = true;
-      for (const finding of this.lint()) console.warn(`[@convex-dev/mcp] ${finding}`);
+      for (const finding of this.lint())
+        console.warn(`[@convex-dev/mcp] ${finding}`);
     }
     const origin = request.headers.get("Origin");
     if (origin && !this.options.allowedOrigins?.includes(origin)) {
@@ -551,9 +586,7 @@ export class McpServer<UserId extends string = string> {
     const user = await this.authenticate(ctx, request);
     if (!user) {
       const hasToken = request.headers.has("Authorization");
-      return respond(
-        this.unauthorized(hasToken ? "invalid_token" : undefined),
-      );
+      return respond(this.unauthorized(hasToken ? "invalid_token" : undefined));
     }
 
     let body: unknown;
@@ -590,7 +623,11 @@ export class McpServer<UserId extends string = string> {
     body: unknown,
     user: McpUser<UserId>,
   ): Promise<Response> {
-    if (!isObject(body) || body.jsonrpc !== "2.0" || typeof body.method !== "string") {
+    if (
+      !isObject(body) ||
+      body.jsonrpc !== "2.0" ||
+      typeof body.method !== "string"
+    ) {
       return json(rpcError(null, -32600, "Invalid Request"), 400);
     }
     const method = body.method;
@@ -605,9 +642,16 @@ export class McpServer<UserId extends string = string> {
     const params = isObject(body.params) ? body.params : {};
     const meta = metaOf(body) ?? {};
     const version = meta[`${META}protocolVersion`];
-    if (typeof version !== "string" || !isObject(meta[`${META}clientCapabilities`])) {
+    if (
+      typeof version !== "string" ||
+      !isObject(meta[`${META}clientCapabilities`])
+    ) {
       return json(
-        rpcError(id, -32602, `Missing _meta["${META}protocolVersion"] or _meta["${META}clientCapabilities"]`),
+        rpcError(
+          id,
+          -32602,
+          `Missing _meta["${META}protocolVersion"] or _meta["${META}clientCapabilities"]`,
+        ),
         400,
       );
     }
@@ -621,11 +665,15 @@ export class McpServer<UserId extends string = string> {
       json(rpcError(id, HEADER_MISMATCH, `Header mismatch: ${message}`), 400);
     const headerVersion = request.headers.get("MCP-Protocol-Version");
     if (headerVersion !== version) {
-      return mismatch(`MCP-Protocol-Version is ${headerVersion ?? "missing"}, body says ${version}`);
+      return mismatch(
+        `MCP-Protocol-Version is ${headerVersion ?? "missing"}, body says ${version}`,
+      );
     }
     const headerMethod = request.headers.get("Mcp-Method");
     if (headerMethod !== method) {
-      return mismatch(`Mcp-Method is ${headerMethod ?? "missing"}, body says ${method}`);
+      return mismatch(
+        `Mcp-Method is ${headerMethod ?? "missing"}, body says ${method}`,
+      );
     }
     if (["tools/call", "resources/read", "prompts/get"].includes(method)) {
       const bodyName = method === "resources/read" ? params.uri : params.name;
@@ -667,10 +715,16 @@ export class McpServer<UserId extends string = string> {
       case "tools/call": {
         const t = this.toolFor(params.name);
         if (!t) {
-          return json(rpcError(id, -32602, `Unknown tool: ${String(params.name)}`), 200);
+          return json(
+            rpcError(id, -32602, `Unknown tool: ${String(params.name)}`),
+            200,
+          );
         }
-        if (!this.allowed(t, user)) return this.insufficientScope(t.definition.scope!);
-        return result(await this.callTool(ctx, t, params.arguments ?? {}, user));
+        if (!this.allowed(t, user))
+          return this.insufficientScope(t.definition.scope!);
+        return result(
+          await this.callTool(ctx, t, params.arguments ?? {}, user),
+        );
       }
       default:
         return json(rpcError(id, -32601, `Method not found: ${method}`), 404);
@@ -686,7 +740,10 @@ export class McpServer<UserId extends string = string> {
   ): Promise<Response> {
     const batch = Array.isArray(body);
     if (batch && headerVersion && headerVersion !== "2025-03-26") {
-      return json(rpcError(null, -32600, "JSON-RPC batching is not supported"), 400);
+      return json(
+        rpcError(null, -32600, "JSON-RPC batching is not supported"),
+        400,
+      );
     }
     const messages = batch ? (body as unknown[]) : [body];
     if (messages.length === 0) {
@@ -733,7 +790,8 @@ export class McpServer<UserId extends string = string> {
       case "initialize": {
         const requested = p.protocolVersion;
         const protocolVersion =
-          typeof requested === "string" && LEGACY_PROTOCOL_VERSIONS.includes(requested)
+          typeof requested === "string" &&
+          LEGACY_PROTOCOL_VERSIONS.includes(requested)
             ? requested
             : LATEST_LEGACY_VERSION;
         return rpcResult(id, {
@@ -755,7 +813,10 @@ export class McpServer<UserId extends string = string> {
         if (!this.allowed(t, user)) {
           return this.insufficientScope(t.definition.scope!);
         }
-        return rpcResult(id, await this.callTool(ctx, t, p.arguments ?? {}, user));
+        return rpcResult(
+          id,
+          await this.callTool(ctx, t, p.arguments ?? {}, user),
+        );
       }
       default:
         return rpcError(id, -32601, `Method not found: ${method}`);
@@ -827,8 +888,12 @@ export class McpServer<UserId extends string = string> {
       if (t.returns && !isError) {
         const checked = checkValue(t.returns, structuredContent, "result");
         if (!checked.ok) {
-          console.error(`MCP tool "${t.name}" returned invalid structuredContent: ${checked.error}`);
-          return errorResult(`Tool "${t.name}" failed. Please try again later.`);
+          console.error(
+            `MCP tool "${t.name}" returned invalid structuredContent: ${checked.error}`,
+          );
+          return errorResult(
+            `Tool "${t.name}" failed. Please try again later.`,
+          );
         }
       }
       return {
@@ -843,7 +908,9 @@ export class McpServer<UserId extends string = string> {
       // can't carry fields the developer didn't intend to expose.
       const checked = checkValue(t.returns, toJsonValue(value), "result");
       if (!checked.ok) {
-        console.error(`MCP tool "${t.name}" returned an invalid result: ${checked.error}`);
+        console.error(
+          `MCP tool "${t.name}" returned an invalid result: ${checked.error}`,
+        );
         return errorResult(`Tool "${t.name}" failed. Please try again later.`);
       }
     }
@@ -860,7 +927,11 @@ export class McpServer<UserId extends string = string> {
       return oauthError("invalid_client_metadata", "Body must be JSON", 400);
     }
     if (!isObject(body)) {
-      return oauthError("invalid_client_metadata", "Body must be an object", 400);
+      return oauthError(
+        "invalid_client_metadata",
+        "Body must be an object",
+        400,
+      );
     }
     const parsed = parseClientMetadata(body);
     if ("error" in parsed) {
@@ -880,8 +951,12 @@ export class McpServer<UserId extends string = string> {
         grant_types: ["authorization_code", "refresh_token"],
         response_types: ["code"],
         token_endpoint_auth_method: "none",
-        ...(parsed.client.clientName ? { client_name: parsed.client.clientName } : {}),
-        ...(parsed.client.clientUri ? { client_uri: parsed.client.clientUri } : {}),
+        ...(parsed.client.clientName
+          ? { client_name: parsed.client.clientName }
+          : {}),
+        ...(parsed.client.clientUri
+          ? { client_uri: parsed.client.clientUri }
+          : {}),
         ...(parsed.client.logoUri ? { logo_uri: parsed.client.logoUri } : {}),
       },
       201,
@@ -893,7 +968,8 @@ export class McpServer<UserId extends string = string> {
   private async resolveClient(ctx: ToolCtx, clientId: string) {
     if (isMetadataDocumentUrl(clientId)) {
       const host = new URL(clientId).hostname;
-      if (!this.options.clientMetadataDocumentHosts?.includes(host)) return null;
+      if (!this.options.clientMetadataDocumentHosts?.includes(host))
+        return null;
       const fetched = await fetchClientMetadata(clientId);
       if (!fetched) return null;
       await ctx.runMutation(this.component.clients.upsertMetadataDocument, {
@@ -952,20 +1028,28 @@ export class McpServer<UserId extends string = string> {
     if (!scopes) return fail("invalid_scope", "Unknown scope requested");
 
     const requestId = randomToken("mcp_req_", 16);
-    const created = await ctx.runMutation(this.component.oauth.createAuthRequest, {
-      requestId,
-      clientId: client.clientId,
-      redirectUri: target,
-      codeChallenge,
-      state,
-      scopes,
-      resource: this.resource,
-      ttlMs: AUTH_REQUEST_TTL_MS,
-    });
+    const created = await ctx.runMutation(
+      this.component.oauth.createAuthRequest,
+      {
+        requestId,
+        clientId: client.clientId,
+        redirectUri: target,
+        codeChallenge,
+        state,
+        scopes,
+        resource: this.resource,
+        ttlMs: AUTH_REQUEST_TTL_MS,
+      },
+    );
     if (!created.ok) {
-      return fail("temporarily_unavailable", "Too many requests, try again shortly");
+      return fail(
+        "temporarily_unavailable",
+        "Too many requests, try again shortly",
+      );
     }
-    return redirect(withParams(this.options.consentUrl, { request: requestId }));
+    return redirect(
+      withParams(this.options.consentUrl, { request: requestId }),
+    );
   }
 
   /** Requested scopes; all scopes when none are requested. */
@@ -985,10 +1069,15 @@ export class McpServer<UserId extends string = string> {
     if (!form) return oauthError("invalid_request", "Expected form body", 400);
     const grantType = form.get("grant_type");
     const clientId = form.get("client_id");
-    if (!clientId) return oauthError("invalid_client", "client_id required", 401);
+    if (!clientId)
+      return oauthError("invalid_client", "client_id required", 401);
     const resource = form.get("resource");
     if (resource && stripSlash(resource) !== this.resource) {
-      return oauthError("invalid_target", `resource must be ${this.resource}`, 400);
+      return oauthError(
+        "invalid_target",
+        `resource must be ${this.resource}`,
+        400,
+      );
     }
     const ttls = {
       accessTtlMs: this.options.accessTokenTtlMs ?? DEFAULT_ACCESS_TTL_MS,
@@ -1003,10 +1092,18 @@ export class McpServer<UserId extends string = string> {
       const verifier = form.get("code_verifier");
       const redirectUri = form.get("redirect_uri");
       if (!code || !redirectUri) {
-        return oauthError("invalid_request", "code and redirect_uri required", 400);
+        return oauthError(
+          "invalid_request",
+          "code and redirect_uri required",
+          400,
+        );
       }
       if (!verifier || !/^[A-Za-z0-9._~-]{43,128}$/.test(verifier)) {
-        return oauthError("invalid_request", "valid code_verifier required", 400);
+        return oauthError(
+          "invalid_request",
+          "valid code_verifier required",
+          400,
+        );
       }
       result = await ctx.runMutation(this.component.oauth.exchangeCode, {
         codeHash: await sha256Hex(code),
@@ -1053,7 +1150,11 @@ export class McpServer<UserId extends string = string> {
         ...ttls,
       });
     } else {
-      return oauthError("unsupported_grant_type", "Unsupported grant_type", 400);
+      return oauthError(
+        "unsupported_grant_type",
+        "Unsupported grant_type",
+        400,
+      );
     }
     if (!result.ok) return oauthError(result.error, undefined, 400);
     return json(
@@ -1093,10 +1194,15 @@ export class McpServer<UserId extends string = string> {
     }
     const resource = form.get("resource");
     if (resource && stripSlash(resource) !== this.resource) {
-      return oauthError("invalid_target", `resource must be ${this.resource}`, 400);
+      return oauthError(
+        "invalid_target",
+        `resource must be ${this.resource}`,
+        400,
+      );
     }
     const scopes = this.parseScopes(form.get("scope"));
-    if (!scopes) return oauthError("invalid_scope", "Unknown scope requested", 400);
+    if (!scopes)
+      return oauthError("invalid_scope", "Unknown scope requested", 400);
 
     const deviceCode = randomToken("mcp_dc_");
     const requestId = randomToken("mcp_req_", 16);
@@ -1104,17 +1210,20 @@ export class McpServer<UserId extends string = string> {
     for (let attempt = 0; ; attempt++) {
       userCode = generateUserCode();
       try {
-        const created = await ctx.runMutation(this.component.oauth.createDeviceRequest, {
-          requestId,
-          clientId,
-          clientName,
-          deviceCodeHash: await sha256Hex(deviceCode),
-          userCode,
-          scopes,
-          resource: this.resource,
-          ttlMs: DEVICE_TTL_MS,
-          intervalMs: DEVICE_INTERVAL_MS,
-        });
+        const created = await ctx.runMutation(
+          this.component.oauth.createDeviceRequest,
+          {
+            requestId,
+            clientId,
+            clientName,
+            deviceCodeHash: await sha256Hex(deviceCode),
+            userCode,
+            scopes,
+            resource: this.resource,
+            ttlMs: DEVICE_TTL_MS,
+            intervalMs: DEVICE_INTERVAL_MS,
+          },
+        );
         if (!created.ok) return tooManyRequests(created.retryAfterMs);
         break;
       } catch (error) {
@@ -1126,7 +1235,9 @@ export class McpServer<UserId extends string = string> {
         device_code: deviceCode,
         user_code: userCode,
         verification_uri: this.options.consentUrl,
-        verification_uri_complete: withParams(this.options.consentUrl, { request: requestId }),
+        verification_uri_complete: withParams(this.options.consentUrl, {
+          request: requestId,
+        }),
         expires_in: DEVICE_TTL_MS / 1000,
         interval: DEVICE_INTERVAL_MS / 1000,
       },
@@ -1222,7 +1333,12 @@ export class McpServer<UserId extends string = string> {
       );
     }
     if (scopes.length) {
-      lines.push("", "## Permissions the user can grant", "", ...scopes.map(([s, d]) => `- \`${s}\`: ${d}`));
+      lines.push(
+        "",
+        "## Permissions the user can grant",
+        "",
+        ...scopes.map(([s, d]) => `- \`${s}\`: ${d}`),
+      );
     }
     if (this.options.describeTools) {
       lines.push(
@@ -1230,7 +1346,8 @@ export class McpServer<UserId extends string = string> {
         "## Tools",
         "",
         ...[...this.tools.values()].map(
-          (t) => `- \`${t.name}\`: ${t.definition.description.replace(/\s+/g, " ")}`,
+          (t) =>
+            `- \`${t.name}\`: ${t.definition.description.replace(/\s+/g, " ")}`,
         ),
       );
     }
@@ -1285,7 +1402,10 @@ export class McpServer<UserId extends string = string> {
       getAuthRequest: queryGeneric({
         args: { requestId: v.string() },
         handler: async (ctx, args) => {
-          const request = await ctx.runQuery(component.oauth.getAuthRequest, args);
+          const request = await ctx.runQuery(
+            component.oauth.getAuthRequest,
+            args,
+          );
           if (!request) return null;
           const scopes = this.options.scopes ?? {};
           return {
@@ -1299,9 +1419,11 @@ export class McpServer<UserId extends string = string> {
             clientId: request.clientId,
             /** Self-reported by the client: label it as unverified. */
             clientName: request.clientName,
-            clientUri: request.kind === "redirect" ? request.clientUri : undefined,
+            clientUri:
+              request.kind === "redirect" ? request.clientUri : undefined,
             logoUri: request.kind === "redirect" ? request.logoUri : undefined,
-            redirectUri: request.kind === "redirect" ? request.redirectUri : undefined,
+            redirectUri:
+              request.kind === "redirect" ? request.redirectUri : undefined,
             userCode: request.kind === "device" ? request.userCode : undefined,
             status: request.status,
             scopes: request.scopes.map((name) => ({
@@ -1325,7 +1447,10 @@ export class McpServer<UserId extends string = string> {
             userCode,
             limitKey: userId,
           });
-          if (!found.ok) throw new ConvexError("Too many attempts. Try again in a few minutes.");
+          if (!found.ok)
+            throw new ConvexError(
+              "Too many attempts. Try again in a few minutes.",
+            );
           return found.requestId;
         },
       }),
@@ -1347,20 +1472,27 @@ export class McpServer<UserId extends string = string> {
         },
         handler: async (ctx, args): Promise<{ redirectUrl: string | null }> => {
           const userId = await requireUser(ctx);
-          const code = args.approve ? randomToken(TOKEN_PREFIX.code) : undefined;
-          const decided = await ctx.runMutation(component.oauth.decideAuthRequest, {
-            requestId: args.requestId,
-            userId,
-            approved: args.approve,
-            codeHash: code ? await sha256Hex(code) : undefined,
-            codeTtlMs: CODE_TTL_MS,
-            confirmedUserCode:
-              args.userCode === undefined
-                ? undefined
-                : (normalizeUserCode(args.userCode) ?? undefined),
-          });
+          const code = args.approve
+            ? randomToken(TOKEN_PREFIX.code)
+            : undefined;
+          const decided = await ctx.runMutation(
+            component.oauth.decideAuthRequest,
+            {
+              requestId: args.requestId,
+              userId,
+              approved: args.approve,
+              codeHash: code ? await sha256Hex(code) : undefined,
+              codeTtlMs: CODE_TTL_MS,
+              confirmedUserCode:
+                args.userCode === undefined
+                  ? undefined
+                  : (normalizeUserCode(args.userCode) ?? undefined),
+            },
+          );
           if (!decided) {
-            throw new ConvexError("This request has expired. Start again from your agent.");
+            throw new ConvexError(
+              "This request has expired. Start again from your agent.",
+            );
           }
           if (decided.kind === "device") {
             if (!decided.confirmed) {
@@ -1374,7 +1506,10 @@ export class McpServer<UserId extends string = string> {
             redirectUrl: withParams(decided.redirectUri, {
               ...(code
                 ? { code }
-                : { error: "access_denied", error_description: "The user denied access" }),
+                : {
+                    error: "access_denied",
+                    error_description: "The user denied access",
+                  }),
               state: decided.state,
               iss: this.issuer,
             }),
@@ -1415,7 +1550,10 @@ export class McpServer<UserId extends string = string> {
        */
       createApiKey: actionGeneric({
         args: { name: v.string(), scopes: v.optional(v.array(v.string())) },
-        handler: async (ctx, args): Promise<{ id: string; apiKey: string; url: string }> =>
+        handler: async (
+          ctx,
+          args,
+        ): Promise<{ id: string; apiKey: string; url: string }> =>
           this.mintApiKey(ctx, await requireUser(ctx), args),
       }),
     };
@@ -1441,7 +1579,10 @@ export class McpServer<UserId extends string = string> {
           name: v.optional(v.string()),
           scopes: v.optional(v.array(v.string())),
         },
-        handler: async (ctx, args): Promise<{ id: string; apiKey: string; url: string }> =>
+        handler: async (
+          ctx,
+          args,
+        ): Promise<{ id: string; apiKey: string; url: string }> =>
           this.mintApiKey(ctx, args.userId, {
             name: args.name ?? "CLI key",
             scopes: args.scopes,
@@ -1477,7 +1618,9 @@ export class McpServer<UserId extends string = string> {
 
 function toCallToolResult(value: unknown, structured: boolean): CallToolResult {
   if (value === undefined || value === null) {
-    return { content: [{ type: "text", text: value === null ? "null" : "Done" }] };
+    return {
+      content: [{ type: "text", text: value === null ? "null" : "Done" }],
+    };
   }
   if (typeof value === "string") {
     return { content: [{ type: "text", text: value }] };
@@ -1530,19 +1673,26 @@ function decodeHeaderValue(value: string | null): string | null {
 function generateUserCode() {
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
-  const chars = [...bytes].map((b) => USER_CODE_ALPHABET[b % USER_CODE_ALPHABET.length]);
+  const chars = [...bytes].map(
+    (b) => USER_CODE_ALPHABET[b % USER_CODE_ALPHABET.length],
+  );
   return `${chars.slice(0, 4).join("")}-${chars.slice(4).join("")}`;
 }
 
 /** Uppercases and re-hyphenates a user code as typed by a person. */
 export function normalizeUserCode(input: string) {
   const letters = input.toUpperCase().replace(/[^A-Z]/g, "");
-  return letters.length === 8 ? `${letters.slice(0, 4)}-${letters.slice(4)}` : null;
+  return letters.length === 8
+    ? `${letters.slice(0, 4)}-${letters.slice(4)}`
+    : null;
 }
 
 /** Self-reported client names: printable, short, single line. */
 function sanitizeName(name: string | null) {
-  const cleaned = name?.replace(/[^\p{L}\p{N} ._()-]/gu, "").trim().slice(0, 60);
+  const cleaned = name
+    ?.replace(/[^\p{L}\p{N} ._()-]/gu, "")
+    .trim()
+    .slice(0, 60);
   return cleaned || undefined;
 }
 
@@ -1561,21 +1711,30 @@ function rpcError(id: string | number | null, code: number, message: string) {
 const PUBLIC_CORS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type, MCP-Protocol-Version",
+  "Access-Control-Allow-Headers":
+    "Authorization, Content-Type, MCP-Protocol-Version",
 };
 
 async function preflight() {
   return new Response(null, { status: 204, headers: PUBLIC_CORS });
 }
 
-function json(body: unknown, status: number, headers: Record<string, string> = {}) {
+function json(
+  body: unknown,
+  status: number,
+  headers: Record<string, string> = {},
+) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json", ...headers },
   });
 }
 
-function oauthError(error: string, description: string | undefined, status: number) {
+function oauthError(
+  error: string,
+  description: string | undefined,
+  status: number,
+) {
   return json(
     { error, ...(description ? { error_description: description } : {}) },
     status,
@@ -1677,11 +1836,14 @@ export function parseClientMetadata(body: Record<string, unknown>):
   if (method !== undefined && method !== "none") {
     return {
       error: "invalid_client_metadata",
-      description: "Only public clients (token_endpoint_auth_method=none) are supported",
+      description:
+        "Only public clients (token_endpoint_auth_method=none) are supported",
     };
   }
   const str = (value: unknown, max: number) =>
-    typeof value === "string" && value.length > 0 ? value.slice(0, max) : undefined;
+    typeof value === "string" && value.length > 0
+      ? value.slice(0, max)
+      : undefined;
   const httpsUrl = (value: unknown) => {
     const s = str(value, MAX_URL_LENGTH);
     return s && /^https:\/\//.test(s) ? s : undefined;
@@ -1710,7 +1872,9 @@ function isAllowedRedirect(uri: string) {
     return ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
   }
   // Native apps use private-use schemes (e.g. cursor://).
-  return !["javascript:", "data:", "file:", "vbscript:", "blob:"].includes(url.protocol);
+  return !["javascript:", "data:", "file:", "vbscript:", "blob:"].includes(
+    url.protocol,
+  );
 }
 
 function isMetadataDocumentUrl(clientId: string) {
@@ -1748,7 +1912,10 @@ async function fetchClientMetadata(clientId: string) {
 }
 
 /** Reads a stream as text, giving up once it exceeds `maxBytes`. */
-async function readCapped(stream: ReadableStream<Uint8Array>, maxBytes: number) {
+async function readCapped(
+  stream: ReadableStream<Uint8Array>,
+  maxBytes: number,
+) {
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;

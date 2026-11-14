@@ -62,29 +62,47 @@ const tool = createTool<Id<"users">>(); // user.userId typed, no casts
 
 // Annotating the type avoids a TS inference cycle with this file's exports.
 export const mcp: McpServer<Id<"users">> = new McpServer(components.mcp, {
-  name: "acme", title: "Acme", version: "1.0.0",
+  name: "acme",
+  title: "Acme",
+  version: "1.0.0",
   instructions: "Short guidance on how the tools fit together.",
   // The frontend page users approve on. Set it explicitly — don't derive it
   // from an existing SITE_URL-style var without checking what that var is.
   consentUrl: process.env.MCP_CONSENT_URL!,
-  scopes: { "docs:read": "Read your documents", "docs:write": "Create and edit your documents" },
+  scopes: {
+    "docs:read": "Read your documents",
+    "docs:write": "Create and edit your documents",
+  },
   tools: {
     search_documents: tool({
-      description: "Search the user's documents by title and content. Returns up to `limit` matches, newest first.",
+      description:
+        "Search the user's documents by title and content. Returns up to `limit` matches, newest first.",
       args: { query: v.string(), limit: v.optional(v.number()) },
-      returns: v.object({ documents: v.array(v.object({ id: v.string(), title: v.string(), snippet: v.string() })) }),
+      returns: v.object({
+        documents: v.array(
+          v.object({ id: v.string(), title: v.string(), snippet: v.string() }),
+        ),
+      }),
       annotations: { readOnlyHint: true },
       scope: "docs:read",
       handler: async (ctx, args, user) => ({
         // Pass the whole user: your access helper sees the connection's scopes.
-        documents: await ctx.runQuery(internal.documents.searchForMcp, { user, ...args }),
+        documents: await ctx.runQuery(internal.documents.searchForMcp, {
+          user,
+          ...args,
+        }),
       }),
     }),
   },
 });
 
-export const { getAuthRequest, authorize, listConnections, revokeConnection, createApiKey } =
-  mcp.api({ getUserId: getAuthUserId });
+export const {
+  getAuthRequest,
+  authorize,
+  listConnections,
+  revokeConnection,
+  createApiKey,
+} = mcp.api({ getUserId: getAuthUserId });
 // For the CLI and tests; internal, so only deploy credentials can call it.
 export const { createApiKeyForUser } = mcp.internalApi();
 ```

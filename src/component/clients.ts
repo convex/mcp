@@ -22,7 +22,8 @@ export const register = mutation({
   ),
   handler: async (ctx, args) => {
     const limit = await rateLimiter.limit(ctx, "registerClient");
-    if (!limit.ok) return { ok: false as const, retryAfterMs: limit.retryAfter };
+    if (!limit.ok)
+      return { ok: false as const, retryAfterMs: limit.retryAfter };
     await ctx.db.insert("clients", {
       ...args,
       expiresAt: Date.now() + UNUSED_CLIENT_TTL_MS,

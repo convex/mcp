@@ -16,7 +16,10 @@ async function newUser(t: T, scopes?: string[]) {
   const userId = await t.run((ctx) => ctx.db.insert("users", {}));
   const asUser = t.withIdentity({ subject: `${userId}|session` });
   const listId = await asUser.mutation(api.lists.ensureDefault, {});
-  const { apiKey } = await asUser.action(api.mcp.createApiKey, { name: "test", scopes });
+  const { apiKey } = await asUser.action(api.mcp.createApiKey, {
+    name: "test",
+    scopes,
+  });
   const call = async (name: string, args: Record<string, unknown> = {}) => {
     const res = await t.fetch("/mcp", {
       method: "POST",
@@ -57,9 +60,17 @@ describe("MCP server in an app", () => {
   test("tools and the UI see the same data", async () => {
     const t = initConvexTest();
     const a = await newUser(t);
-    const added = await a.call("add_todo", { listId: a.listId, text: "Write tests" });
-    expect(added.body.result.structuredContent).toMatchObject({ text: "Write tests", done: false });
-    expect(await a.asUser.query(api.todos.list, { listId: a.listId })).toHaveLength(1);
+    const added = await a.call("add_todo", {
+      listId: a.listId,
+      text: "Write tests",
+    });
+    expect(added.body.result.structuredContent).toMatchObject({
+      text: "Write tests",
+      done: false,
+    });
+    expect(
+      await a.asUser.query(api.todos.list, { listId: a.listId }),
+    ).toHaveLength(1);
     const lists = await a.call("list_lists");
     expect(lists.body.result.structuredContent.lists).toEqual([
       { id: a.listId, name: "My todos", role: "owner" },
@@ -72,10 +83,12 @@ describe("MCP server in an app", () => {
     const b = await newUser(t);
     const viaAgent = await b.call("add_todo", { listId: a.listId, text: "x" });
     expect(viaAgent.body.result.isError).toBe(true);
-    expect(viaAgent.body.result.content[0].text).toBe(`No list with id ${a.listId}`);
-    await expect(b.asUser.mutation(api.todos.add, { listId: a.listId, text: "x" })).rejects.toThrow(
-      /No list with id/,
+    expect(viaAgent.body.result.content[0].text).toBe(
+      `No list with id ${a.listId}`,
     );
+    await expect(
+      b.asUser.mutation(api.todos.add, { listId: a.listId, text: "x" }),
+    ).rejects.toThrow(/No list with id/);
   });
 
   test("sharing: a viewer can read but not edit — in the UI and through an agent", async () => {
@@ -90,11 +103,16 @@ describe("MCP server in an app", () => {
     expect(read.body.result.structuredContent.todos).toHaveLength(1);
     const write = await b.call("add_todo", { listId: a.listId, text: "nope" });
     expect(write.body.result.isError).toBe(true);
-    await expect(b.asUser.mutation(api.todos.add, { listId: a.listId, text: "nope" })).rejects.toThrow();
+    await expect(
+      b.asUser.mutation(api.todos.add, { listId: a.listId, text: "nope" }),
+    ).rejects.toThrow();
 
     // Upgrading to editor lets both paths write.
     await b.asUser.mutation(api.lists.join, { code: mine.editorCode! });
-    const ok = await b.call("add_todo", { listId: a.listId, text: "from B's agent" });
+    const ok = await b.call("add_todo", {
+      listId: a.listId,
+      text: "from B's agent",
+    });
     expect(ok.body.result.structuredContent.text).toBe("from B's agent");
   });
 
@@ -120,10 +138,15 @@ describe("MCP server in an app", () => {
   test("operators can mint a key for a user from the CLI", async () => {
     const t = initConvexTest();
     const userId = await t.run((ctx) => ctx.db.insert("users", {}));
-    const { apiKey } = await t.action(internal.mcp.createApiKeyForUser, { userId });
+    const { apiKey } = await t.action(internal.mcp.createApiKeyForUser, {
+      userId,
+    });
     const res = await t.fetch("/mcp", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "MCP-Protocol-Version": "2025-06-18" },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "MCP-Protocol-Version": "2025-06-18",
+      },
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,

@@ -7,7 +7,11 @@ const authRequestCommon = {
   scopes: v.array(v.string()),
   resource: v.string(),
   expiresAt: v.number(),
-  status: v.union(v.literal("pending"), v.literal("approved"), v.literal("denied")),
+  status: v.union(
+    v.literal("pending"),
+    v.literal("approved"),
+    v.literal("denied"),
+  ),
   userId: v.optional(v.string()),
 };
 
@@ -69,8 +73,7 @@ export default defineSchema({
     scopes: v.array(v.string()),
     resource: v.string(),
     lastUsedAt: v.optional(v.number()),
-  })
-    .index("userId", ["userId"]),
+  }).index("userId", ["userId"]),
 
   tokens: defineTable({
     hash: v.string(),

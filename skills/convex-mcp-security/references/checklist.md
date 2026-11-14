@@ -3,7 +3,7 @@
 ## Inventory
 
 | Tool | Calls | R/W | Whose data | `returns`? | Scope | Annotations | Returns 3rd-party text? | Sends data out? |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ---- | ----- | --- | ---------- | ---------- | ----- | ----------- | ----------------------- | --------------- |
 
 "Sends data out" = email, messages, webhooks, `fetch` to a model-chosen
 URL, creating public/shareable links, inviting people, changing sharing,
@@ -20,7 +20,7 @@ payments.
 
 - [ ] Handlers take identity **only** from `user.userId` (third handler
       argument). No tool `args` named `userId`, `ownerId`, `email`,
-      `accountId`, `teamId`/`orgId` that decide *whose* data is touched
+      `accountId`, `teamId`/`orgId` that decide _whose_ data is touched
       without a membership check.
 - [ ] `getUserId` in `mcp.api({ getUserId })` returns a stable, unique ID:
       users-table ID (`getAuthUserId`) or `identity.tokenIdentifier`. Not
@@ -35,13 +35,13 @@ payments.
 - [ ] Apps with sharing/roles: internal functions call the **same** access
       helper as the UI (e.g. `requireAccess(ctx, userId, id, "edit")`), with
       the right level per tool (view/edit/admin). Prove with a third user who
-      has *view* access: write tools must refuse them, read tools must work.
+      has _view_ access: write tools must refuse them, read tools must work.
 
 ## 2. Functions the tools call (Critical if wrong)
 
 - [ ] Every function a tool calls with `userId` is
       `internalQuery`/`internalMutation`/`internalAction`. A **public**
-      function that *trusts* a `userId` argument is callable by anyone from
+      function that _trusts_ a `userId` argument is callable by anyone from
       any Convex client — the most common real bug. (A public function that
       authenticates and checks `userId` equals the caller is fine, but
       shouldn't be what tools call.)
@@ -49,9 +49,9 @@ payments.
       **ownership-checked against `userId`** before read or write, including
       IDs of child objects (a comment ID in a project the user can't see).
 - [ ] Writes into a container (add item to list/project/channel) check the
-      user may write to *that container*.
+      user may write to _that container_.
 - [ ] Search/list functions filter by the user (index on owner) before
-      `take()`. Other filters applied *after* `take()` silently return
+      `take()`. Other filters applied _after_ `take()` silently return
       incomplete results (report under Other unless it leaks data).
 - [ ] No tool calls admin/internal maintenance functions (`internal.admin.*`,
       migrations, billing overrides) unless explicitly intended and scoped.
@@ -109,7 +109,7 @@ payments.
       `destructiveHint: true` on deletes, sends, payments, sharing changes,
       bulk operations. Note the MCP defaults when omitted:
       `destructiveHint: true`, `openWorldHint: true` — missing annotations
-      make tools look *more* dangerous (a UX issue, Low), so set
+      make tools look _more_ dangerous (a UX issue, Low), so set
       `destructiveHint: false` / `openWorldHint: false` where accurate.
       Clients treat annotations as untrusted hints; they are not enforcement.
 - [ ] Scope descriptions (shown on the consent page) are accurate and

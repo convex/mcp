@@ -34,7 +34,9 @@ export const createAuthRequest = mutation({
   ),
   handler: async (ctx, { ttlMs, ...args }) => {
     for (const limit of [
-      await rateLimiter.limit(ctx, "authRequestPerClient", { key: args.clientId }),
+      await rateLimiter.limit(ctx, "authRequestPerClient", {
+        key: args.clientId,
+      }),
       await rateLimiter.limit(ctx, "authRequestGlobal"),
     ]) {
       if (!limit.ok) {
@@ -106,8 +108,11 @@ export const findByUserCode = mutation({
     v.object({ ok: v.literal(false), retryAfterMs: v.number() }),
   ),
   handler: async (ctx, args) => {
-    const limit = await rateLimiter.limit(ctx, "userCodeLookup", { key: args.limitKey });
-    if (!limit.ok) return { ok: false as const, retryAfterMs: limit.retryAfter };
+    const limit = await rateLimiter.limit(ctx, "userCodeLookup", {
+      key: args.limitKey,
+    });
+    if (!limit.ok)
+      return { ok: false as const, retryAfterMs: limit.retryAfter };
     const request = await ctx.db
       .query("authRequests")
       .withIndex("userCode", (q) => q.eq("userCode", args.userCode))
@@ -266,9 +271,15 @@ export const pollDevice = mutation({
   handler: async (ctx, args) => {
     const request = await ctx.db
       .query("authRequests")
-      .withIndex("deviceCodeHash", (q) => q.eq("deviceCodeHash", args.deviceCodeHash))
+      .withIndex("deviceCodeHash", (q) =>
+        q.eq("deviceCodeHash", args.deviceCodeHash),
+      )
       .unique();
-    if (!request || request.kind !== "device" || request.clientId !== args.clientId) {
+    if (
+      !request ||
+      request.kind !== "device" ||
+      request.clientId !== args.clientId
+    ) {
       return { ok: false as const, error: "invalid_grant" };
     }
     const now = Date.now();

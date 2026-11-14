@@ -40,5 +40,10 @@ export const cleanup = internalMutation({
 });
 
 const crons = cronJobs();
-crons.interval("delete expired MCP credentials", { hours: 1 }, internal.crons.cleanup, {});
+crons.interval(
+  "delete expired MCP credentials",
+  { hours: 1 },
+  internal.crons.cleanup,
+  {},
+);
 export default crons;
