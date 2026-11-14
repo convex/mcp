@@ -297,6 +297,36 @@ connections UI.
 - **Errors.** Throw `ConvexError("…")` to send the model a message it can act
   on. Other errors are logged, and the model gets a generic failure.
 
+### Resources
+
+Serve resources, such as the HTML for an app's interactive UI, with
+`resources`, keyed by URI:
+
+```ts
+const mcp = new McpServer(components.mcp, {
+  // ...
+  resources: {
+    "ui://widgets/card.html": {
+      name: "card",
+      mimeType: "text/html;profile=mcp-app",
+      handler: async () => cardHtml,
+    },
+  },
+});
+```
+
+- **Handlers** receive the action `ctx` and the verified user, like tool
+  handlers. A string becomes text contents; return `{ text }` or
+  `{ blob }` (base64) with an optional `_meta` for more control.
+- **`_meta`.** `meta` on a resource is advertised in `resources/list`.
+  Both are opaque to the component, as for tools.
+- **Scopes** work as for tools: a resource with `scope` is hidden from
+  connections without it, and reading it gets HTTP 403.
+- **Errors.** Throw `ConvexError("…")` to send the client a message. Other
+  errors are logged, and the client gets a generic failure.
+- The server advertises the `resources` capability only when `resources` is
+  non-empty. Resource templates and subscriptions aren't supported.
+
 ### Scopes
 
 Give a tool `scope: "x"` (it must be a key of `scopes`). A connection only
@@ -406,7 +436,8 @@ const res = await t.fetch("/mcp", { method: "POST", headers: { Authorization: `B
 - **Device flow and the pasted-URL guide** are on by default. Turn them off
   with `deviceFlow: false`.
 - **Not yet supported:** server-to-client streaming (SSE progress,
-  sampling, elicitation), resources and prompts, and confidential clients.
+  sampling, elicitation), resource templates and subscriptions, prompts,
+  and confidential clients.
 - **Rate limiting.** Client registration and `/authorize` are rate limited
   through a bundled `@convex-dev/rate-limiter` instance. Limits are global or
   per client, not per IP. The MCP endpoint itself isn't rate limited yet.

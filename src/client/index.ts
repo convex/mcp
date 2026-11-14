@@ -182,6 +182,41 @@ export function createTool<UserId extends string>() {
 }
 
 // ---------------------------------------------------------------------------
+// Resource definitions
+
+/** What a resource handler returns: text, or binary data as base64. */
+export type ResourceContents = ({ text: string } | { blob: string }) & {
+  /** App metadata sent with these contents in `resources/read`. */
+  _meta?: Record<string, unknown>;
+};
+
+/** https://modelcontextprotocol.io/specification/2025-11-25/server/resources */
+export type ResourceDefinition<UserId extends string = string> = {
+  /** Programmatic name, required by MCP. */
+  name: string;
+  /** Human-friendly display name. */
+  title?: string;
+  description?: string;
+  mimeType?: string;
+  /**
+   * App metadata advertised with this resource in `resources/list`. Opaque to
+   * the component and passed through verbatim, like a tool's `meta`.
+   */
+  meta?: Record<string, unknown>;
+  /**
+   * OAuth scope required to see and read this resource. Must be one of the
+   * server's `scopes`. Resources without a scope are available to every
+   * connection.
+   */
+  scope?: string;
+  /** A string becomes text contents. */
+  handler: (
+    ctx: ToolCtx,
+    user: McpUser<UserId>,
+  ) => Promise<string | ResourceContents>;
+};
+
+// ---------------------------------------------------------------------------
 // Server
 
 export type McpServerOptions<UserId extends string = string> = {
@@ -192,6 +227,11 @@ export type McpServerOptions<UserId extends string = string> = {
   /** Guidance for the model on how to use this server's tools. */
   instructions?: string;
   tools: Record<string, ToolDefinition<any, any, UserId>>;
+  /**
+   * Resources keyed by URI, e.g. `"ui://widgets/card.html"`. The server
+   * advertises the `resources` capability only when this is non-empty.
+   */
+  resources?: Record<string, ResourceDefinition<UserId>>;
   /**
    * Your app's consent page. Users are sent to `${consentUrl}?request=<id>`;
    * the page signs them in, shows `getAuthRequest`, and calls `authorize`.
@@ -260,7 +300,7 @@ const META = "io.modelcontextprotocol/";
 // JSON-RPC error codes defined by MCP 2026-07-28.
 const HEADER_MISMATCH = -32020;
 const UNSUPPORTED_PROTOCOL_VERSION = -32022;
-const TOOLS_LIST_TTL_MS = 5 * 60_000;
+const LIST_TTL_MS = 5 * 60_000;
 
 const AUTH_REQUEST_TTL_MS = 10 * 60_000;
 const CODE_TTL_MS = 60_000;
@@ -282,8 +322,15 @@ type CompiledTool = {
   listing: Record<string, unknown>;
 };
 
+type CompiledResource = {
+  uri: string;
+  definition: ResourceDefinition<any>;
+  listing: Record<string, unknown>;
+};
+
 export class McpServer<UserId extends string = string> {
   private readonly tools: Map<string, CompiledTool>;
+  private readonly resources: Map<string, CompiledResource>;
   readonly path: string;
   private warned = false;
 
@@ -319,6 +366,30 @@ export class McpServer<UserId extends string = string> {
           ...(definition.annotations
             ? { annotations: definition.annotations }
             : {}),
+          ...(definition.meta ? { _meta: definition.meta } : {}),
+        },
+      });
+    }
+    this.resources = new Map();
+    for (const [uri, definition] of Object.entries(options.resources ?? {})) {
+      // An absolute URI (RFC 3986): a scheme, then no whitespace.
+      if (!/^[A-Za-z][A-Za-z0-9+.-]*:\S+$/.test(uri)) {
+        throw new Error(`Invalid MCP resource URI "${uri}"`);
+      }
+      if (definition.scope && !options.scopes?.[definition.scope]) {
+        throw new Error(
+          `Resource "${uri}" requires scope "${definition.scope}", which is not in \`scopes\``,
+        );
+      }
+      this.resources.set(uri, {
+        uri,
+        definition,
+        listing: {
+          uri,
+          name: definition.name,
+          ...(definition.title ? { title: definition.title } : {}),
+          ...(definition.description ? { description: definition.description } : {}),
+          ...(definition.mimeType ? { mimeType: definition.mimeType } : {}),
           ...(definition.meta ? { _meta: definition.meta } : {}),
         },
       });
@@ -646,7 +717,7 @@ export class McpServer<UserId extends string = string> {
         200,
       );
     };
-    switch (method) {
+    switch (this.served(method)) {
       case "server/discover":
         return result({
           supportedVersions: PROTOCOL_VERSIONS,
@@ -654,13 +725,13 @@ export class McpServer<UserId extends string = string> {
           ...(this.options.instructions
             ? { instructions: this.options.instructions }
             : {}),
-          ttlMs: TOOLS_LIST_TTL_MS,
+          ttlMs: LIST_TTL_MS,
           cacheScope: "public",
         });
       case "tools/list":
         return result({
           tools: this.listTools(user),
-          ttlMs: TOOLS_LIST_TTL_MS,
+          ttlMs: LIST_TTL_MS,
           // The list depends on the caller's scopes.
           cacheScope: "private",
         });
@@ -671,6 +742,26 @@ export class McpServer<UserId extends string = string> {
         }
         if (!this.allowed(t, user)) return this.insufficientScope(t.definition.scope!);
         return result(await this.callTool(ctx, t, params.arguments ?? {}, user));
+      }
+      case "resources/list":
+        return result({
+          resources: this.listResources(user),
+          ttlMs: LIST_TTL_MS,
+          // Like tools/list, the list depends on the caller's scopes.
+          cacheScope: "private",
+        });
+      case "resources/templates/list":
+        return result({ resourceTemplates: [], ttlMs: LIST_TTL_MS, cacheScope: "public" });
+      case "resources/read": {
+        const r = this.resourceFor(params.uri);
+        // 2026-07-28 reports a missing resource as invalid params; earlier
+        // versions used -32002.
+        if (!r) {
+          return json(rpcError(id, -32602, "Resource not found", { uri: params.uri }), 200);
+        }
+        if (!this.allowed(r, user)) return this.insufficientScope(r.definition.scope!);
+        const read = await this.readResource(ctx, r, user);
+        return "error" in read ? json(rpcError(id, -32603, read.error), 200) : result(read);
       }
       default:
         return json(rpcError(id, -32601, `Method not found: ${method}`), 404);
@@ -729,7 +820,7 @@ export class McpServer<UserId extends string = string> {
     }
     const p = isObject(params) ? params : {};
 
-    switch (method) {
+    switch (this.served(method)) {
       case "initialize": {
         const requested = p.protocolVersion;
         const protocolVersion =
@@ -757,6 +848,19 @@ export class McpServer<UserId extends string = string> {
         }
         return rpcResult(id, await this.callTool(ctx, t, p.arguments ?? {}, user));
       }
+      case "resources/list":
+        return rpcResult(id, { resources: this.listResources(user) });
+      case "resources/templates/list":
+        return rpcResult(id, { resourceTemplates: [] });
+      case "resources/read": {
+        const r = this.resourceFor(p.uri);
+        if (!r) return rpcError(id, -32002, "Resource not found", { uri: p.uri });
+        if (!this.allowed(r, user)) {
+          return this.insufficientScope(r.definition.scope!);
+        }
+        const read = await this.readResource(ctx, r, user);
+        return "error" in read ? rpcError(id, -32603, read.error) : rpcResult(id, read);
+      }
       default:
         return rpcError(id, -32601, `Method not found: ${method}`);
     }
@@ -771,7 +875,18 @@ export class McpServer<UserId extends string = string> {
   }
 
   private get capabilities() {
-    return { tools: { listChanged: false } };
+    return {
+      tools: { listChanged: false },
+      ...(this.resources.size ? { resources: { listChanged: false } } : {}),
+    };
+  }
+
+  /**
+   * The method to dispatch, or null (method not found) for `resources/*` on a
+   * server that doesn't advertise the `resources` capability.
+   */
+  private served(method: string): string | null {
+    return method.startsWith("resources/") && !this.resources.size ? null : method;
   }
 
   /** Tools visible to this connection, in definition order (deterministic). */
@@ -785,8 +900,55 @@ export class McpServer<UserId extends string = string> {
     return typeof name === "string" ? this.tools.get(name) : undefined;
   }
 
-  private allowed(t: CompiledTool, user: McpUser<UserId>) {
-    return !t.definition.scope || user.scopes.includes(t.definition.scope);
+  /** Resources visible to this connection, in definition order. */
+  private listResources(user: McpUser<UserId>) {
+    return [...this.resources.values()]
+      .filter((r) => this.allowed(r, user))
+      .map((r) => r.listing);
+  }
+
+  private resourceFor(uri: unknown) {
+    return typeof uri === "string" ? this.resources.get(uri) : undefined;
+  }
+
+  private allowed(
+    item: { definition: { scope?: string } },
+    user: McpUser<UserId>,
+  ) {
+    return !item.definition.scope || user.scopes.includes(item.definition.scope);
+  }
+
+  private async readResource(
+    ctx: ToolCtx,
+    r: CompiledResource,
+    user: McpUser<UserId>,
+  ): Promise<{ contents: Record<string, unknown>[] } | { error: string }> {
+    let value: string | ResourceContents;
+    try {
+      value = await r.definition.handler(ctx, user);
+    } catch (error) {
+      if (error instanceof ConvexError) {
+        const data = error.data;
+        return {
+          error: typeof data === "string" ? data : JSON.stringify(toJsonValue(data)),
+        };
+      }
+      console.error(`MCP resource "${r.uri}" failed`, error);
+      return { error: `Resource "${r.uri}" failed. Please try again later.` };
+    }
+    const contents: ResourceContents =
+      typeof value === "string" ? { text: value } : value;
+    return {
+      contents: [
+        {
+          uri: r.uri,
+          ...(r.definition.mimeType ? { mimeType: r.definition.mimeType } : {}),
+          // Copy only known fields, so nothing else a handler returns leaks.
+          ...("text" in contents ? { text: contents.text } : { blob: contents.blob }),
+          ...(contents._meta ? { _meta: contents._meta } : {}),
+        },
+      ],
+    };
   }
 
   private insufficientScope(scope: string) {
@@ -1554,8 +1716,17 @@ function rpcResult(id: string | number, result: unknown) {
   return { jsonrpc: "2.0", id, result };
 }
 
-function rpcError(id: string | number | null, code: number, message: string) {
-  return { jsonrpc: "2.0", id, error: { code, message } };
+function rpcError(
+  id: string | number | null,
+  code: number,
+  message: string,
+  data?: unknown,
+) {
+  return {
+    jsonrpc: "2.0",
+    id,
+    error: { code, message, ...(data === undefined ? {} : { data }) },
+  };
 }
 
 const PUBLIC_CORS: Record<string, string> = {
