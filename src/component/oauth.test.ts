@@ -221,6 +221,50 @@ describe("grants", () => {
   });
 });
 
+describe("issued access tokens", () => {
+  const issue = {
+    userId: "user1",
+    clientId: "workload",
+    name: "Workload",
+    scopes: ["read"],
+    resource: "https://app.example/mcp",
+    accessHash: "at1",
+    accessTtlMs: 60_000,
+  };
+
+  test("verifies until it expires, with no refresh token", async () => {
+    const t = initConvexTest();
+    const grantId = await t.mutation(api.grants.issueAccessToken, issue);
+    expect(await t.query(api.tokens.verify, { hash: "at1", now: Date.now() })).toMatchObject({
+      userId: "user1",
+      grantId,
+      kind: "access",
+      scopes: ["read"],
+      resource: "https://app.example/mcp",
+      clientId: "workload",
+    });
+    const later = Date.now() + issue.accessTtlMs + 1;
+    expect(await t.query(api.tokens.verify, { hash: "at1", now: later })).toBeNull();
+    expect(
+      await t.mutation(api.oauth.refresh, {
+        refreshHash: "at1",
+        clientId: "workload",
+        accessHash: "at2",
+        newRefreshHash: "rt2",
+        ...ttls,
+      }),
+    ).toEqual({ ok: false, error: "invalid_grant" });
+  });
+
+  test("is revoked with its grant, only by its owner", async () => {
+    const t = initConvexTest();
+    const grantId = await t.mutation(api.grants.issueAccessToken, issue);
+    expect(await t.mutation(api.grants.revoke, { userId: "user2", grantId })).toBe(false);
+    expect(await t.mutation(api.grants.revoke, { userId: "user1", grantId })).toBe(true);
+    expect(await t.query(api.tokens.verify, { hash: "at1", now: Date.now() })).toBeNull();
+  });
+});
+
 describe("rate limits", () => {
   test("client registration is rate limited", async () => {
     const t = initConvexTest();

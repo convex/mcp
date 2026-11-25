@@ -78,6 +78,21 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         string,
         Name
       >;
+      issueAccessToken: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          accessHash: string;
+          accessTtlMs: number;
+          clientId: string;
+          name: string;
+          resource: string;
+          scopes: Array<string>;
+          userId: string;
+        },
+        string,
+        Name
+      >;
       list: FunctionReference<
         "query",
         "internal",

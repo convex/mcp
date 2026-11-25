@@ -1,7 +1,7 @@
 // Connections between a user and an agent, for a "Connected agents" page.
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server.js";
-import { deleteGrant } from "./tokens.js";
+import { deleteGrant, issueTokens } from "./tokens.js";
 
 const grantValidator = v.object({
   _id: v.id("grants"),
@@ -62,6 +62,40 @@ export const createApiKey = mutation({
       hash: args.hash,
       grantId,
       kind: "apiKey",
+    });
+    return grantId;
+  },
+});
+
+/**
+ * Issues a short-lived access token, with no refresh token, for a caller that
+ * has already authenticated the user itself (for example a workload with its
+ * own identity). The caller chooses `userId` and `scopes`, so only trusted
+ * backend code may call this.
+ */
+export const issueAccessToken = mutation({
+  args: {
+    userId: v.string(),
+    clientId: v.string(),
+    name: v.string(),
+    scopes: v.array(v.string()),
+    resource: v.string(),
+    accessHash: v.string(),
+    accessTtlMs: v.number(),
+  },
+  returns: v.id("grants"),
+  handler: async (ctx, args) => {
+    const grantId = await ctx.db.insert("grants", {
+      userId: args.userId,
+      kind: "oauth",
+      clientId: args.clientId,
+      name: args.name,
+      scopes: args.scopes,
+      resource: args.resource,
+    });
+    await issueTokens(ctx, grantId, {
+      accessHash: args.accessHash,
+      accessTtlMs: args.accessTtlMs,
     });
     return grantId;
   },
