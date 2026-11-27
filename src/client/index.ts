@@ -87,6 +87,17 @@ export type ToolAnnotations = {
   openWorldHint?: boolean;
 };
 
+/**
+ * An optionally-sized icon displayed in client UIs (SEP-973).
+ * https://modelcontextprotocol.io/specification/2026-07-28/basic/index#icons
+ */
+export type Icon = {
+  src: string;
+  mimeType?: string;
+  sizes?: string[];
+  theme?: "light" | "dark";
+};
+
 export type ContentBlock =
   | { type: "text"; text: string }
   | { type: "image"; data: string; mimeType: string }
@@ -130,6 +141,8 @@ export type ToolDefinition<
   /** Optional validator for the result; exposed as `outputSchema`. */
   returns?: Returns;
   annotations?: ToolAnnotations;
+  /** Optional icons displayed for this tool in client UIs (SEP-973). */
+  icons?: Icon[];
   /**
    * App metadata advertised with this tool in `tools/list`. Opaque to the
    * component and passed through verbatim: MCP reserves `_meta` on every
@@ -189,6 +202,12 @@ export type McpServerOptions<UserId extends string = string> = {
   name: string;
   version: string;
   title?: string;
+  /** Human-readable description of the server, reported in `serverInfo`. */
+  description?: string;
+  /** URL of the server's website, reported in `serverInfo`. */
+  websiteUrl?: string;
+  /** Optional icons displayed for this server in client UIs (SEP-973). */
+  icons?: Icon[];
   /** Guidance for the model on how to use this server's tools. */
   instructions?: string;
   tools: Record<string, ToolDefinition<any, any, UserId>>;
@@ -319,6 +338,7 @@ export class McpServer<UserId extends string = string> {
           ...(definition.annotations
             ? { annotations: definition.annotations }
             : {}),
+          ...(definition.icons?.length ? { icons: definition.icons } : {}),
           ...(definition.meta ? { _meta: definition.meta } : {}),
         },
       });
@@ -767,6 +787,9 @@ export class McpServer<UserId extends string = string> {
       name: this.options.name,
       version: this.options.version,
       ...(this.options.title ? { title: this.options.title } : {}),
+      ...(this.options.description ? { description: this.options.description } : {}),
+      ...(this.options.websiteUrl ? { websiteUrl: this.options.websiteUrl } : {}),
+      ...(this.options.icons?.length ? { icons: this.options.icons } : {}),
     };
   }
 

@@ -407,3 +407,87 @@ describe("GET /mcp guide", () => {
     expect(open.guide()).toContain("secret_tool");
   });
 });
+
+describe("serverInfo metadata and icons (SEP-973)", () => {
+  const serverIcons = [
+    { src: "https://example.com/icon-light.svg", mimeType: "image/svg+xml", sizes: ["any"], theme: "light" as const },
+    { src: "data:image/png;base64,iVBORw0KGgo=", mimeType: "image/png", sizes: ["48x48"], theme: "dark" as const },
+  ];
+  const toolIcons = [
+    { src: "https://example.com/tool.png", mimeType: "image/png", sizes: ["48x48"] },
+  ];
+
+  const make = () =>
+    new McpServer(components.mcp, {
+      name: "todos",
+      title: "Todos",
+      version: "1.2.3",
+      description: "Manage your todo lists.",
+      websiteUrl: "https://example.com",
+      icons: serverIcons,
+      consentUrl: "https://app.example/connect",
+      siteUrl: "https://site.example",
+      warnings: false,
+      tools: {
+        list_todos: tool({
+          description: "List todos",
+          icons: toolIcons,
+          handler: async () => [],
+        }),
+        plain: tool({
+          description: "No icons",
+          icons: [],
+          handler: async () => "ok",
+        }),
+      },
+    });
+
+  test("serverInfo exposes description, websiteUrl and icons in legacy initialize and modern _meta", async () => {
+    const s = make();
+    const expectedServerInfo = {
+      name: "todos",
+      title: "Todos",
+      version: "1.2.3",
+      description: "Manage your todo lists.",
+      websiteUrl: "https://example.com",
+      icons: serverIcons,
+    };
+
+    const legacy = await call(s, ctx(), rpc("initialize", { protocolVersion: "2025-11-25" }), "2025-11-25");
+    expect(legacy.body.result.serverInfo).toEqual(expectedServerInfo);
+
+    const discover = await s.handleMcp(
+      ctx(),
+      new Request("https://site.example/mcp", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer key",
+          "Content-Type": "application/json",
+          "MCP-Protocol-Version": "2026-07-28",
+          "Mcp-Method": "server/discover",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "server/discover",
+          params: {
+            _meta: {
+              "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+              "io.modelcontextprotocol/clientCapabilities": {},
+            },
+          },
+        }),
+      }),
+    );
+    expect((await discover.json()).result._meta["io.modelcontextprotocol/serverInfo"]).toEqual(
+      expectedServerInfo,
+    );
+  });
+
+  test("tools/list includes non-empty icons and omits empty ones", async () => {
+    const r = await call(make(), ctx(), rpc("tools/list"), "2025-11-25");
+    const byName = Object.fromEntries(r.body.result.tools.map((t: any) => [t.name, t]));
+    expect(byName.list_todos.icons).toEqual(toolIcons);
+    expect("icons" in byName.plain).toBe(false);
+  });
+});
