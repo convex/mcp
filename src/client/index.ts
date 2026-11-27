@@ -456,7 +456,7 @@ export class McpServer<UserId extends string = string> {
       response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
       response.headers.set(
         "Access-Control-Allow-Headers",
-        "Authorization, Content-Type, Accept, MCP-Protocol-Version, Mcp-Session-Id, Last-Event-ID",
+        "Authorization, Content-Type, Accept, MCP-Protocol-Version, Mcp-Method, Mcp-Name, Mcp-Session-Id, Last-Event-ID",
       );
       response.headers.set(
         "Access-Control-Expose-Headers",
