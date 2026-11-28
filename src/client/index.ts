@@ -761,7 +761,12 @@ export class McpServer<UserId extends string = string> {
         }
         if (!this.allowed(r, user)) return this.insufficientScope(r.definition.scope!);
         const read = await this.readResource(ctx, r, user);
-        return "error" in read ? json(rpcError(id, -32603, read.error), 200) : result(read);
+        // resources/read is cacheable in 2026-07-28 too: clients reject a
+        // result without ttlMs and cacheScope. Private, like resources/list,
+        // because scopes decide who may read it.
+        return "error" in read
+          ? json(rpcError(id, -32603, read.error), 200)
+          : result({ ...read, ttlMs: LIST_TTL_MS, cacheScope: "private" });
       }
       default:
         return json(rpcError(id, -32601, `Method not found: ${method}`), 404);

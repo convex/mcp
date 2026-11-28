@@ -358,9 +358,11 @@ describe("MCP 2026-07-28 (stateless)", () => {
     const read = await modern(withResources(), "resources/read", { uri: CARD }, { "Mcp-Name": CARD });
     expect(read.body.result).toMatchObject({
       resultType: "complete",
+      cacheScope: "private",
       contents: [{ uri: CARD, text: "<p>card</p>" }],
       _meta: { [`${META}serverInfo`]: { name: "test", version: "1" } },
     });
+    expect(read.body.result.ttlMs).toBeGreaterThan(0);
 
     const missing = await modern(
       withResources(),

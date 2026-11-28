@@ -99,9 +99,9 @@ errors are `-32603`, with `ConvexError` messages passed through.
   `MCP-Protocol-Version` / `Mcp-Method` / `Mcp-Name` headers that must match
   the body (`-32020`), `-32022` with the supported versions, `resultType` +
   `serverInfo` `_meta` on every result (merged with any app `_meta`),
-  `ttlMs`/`cacheScope` on lists
-  (`private` for `tools/list` and `resources/list`, which depend on the
-  token's scopes), 404 for
+  `ttlMs`/`cacheScope` on lists and `resources/read`
+  (`private` for `tools/list`, `resources/list` and `resources/read`, which
+  depend on the token's scopes), 404 for
   unknown methods. Other requests get the legacy behavior below.
 - Streamable HTTP, **stateless**: no `Mcp-Session-Id`. Requests are answered
   with `application/json`; POSTs carrying only notifications/responses get
